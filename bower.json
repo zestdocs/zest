@@ -1,0 +1,17 @@
+{
+  "name": "zest",
+  "version": "0.0.0",
+  "dependencies": {
+    "picnic": "~4.1.3"
+  },
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "spec"
+  ]
+}

@@ -1,0 +1,18 @@
+/* split.js */
+.split, .gutter.gutter-horizontal, #left, #right {
+  height: 100%;
+  float: left;
+}
+
+.gutter {
+  background-color: #eee;
+
+  background-repeat: no-repeat;
+  background-position: 50%;
+}
+
+.gutter.gutter-horizontal {
+  background-image: url('grips/vertical.png');
+  cursor: ew-resize;
+}
+
