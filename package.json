@@ -3,7 +3,9 @@
   "license": "Private",
   "private": true,
   "dependencies": {
+    "escape-html": "^1.0.3",
     "fs-extra": "0.24.0",
+    "parse5": "^2.1.0",
     "split.js": "^1.0.6"
   },
   "devDependencies": {
