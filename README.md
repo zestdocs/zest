@@ -147,3 +147,67 @@ To run a command, type `lein <command>` in the terminal.
 |---------------|-------------------------------------------------------------------------------------------|
 | cljfmt fix    | Auto-formats all clj/cljs code. See [cljfmt](https://github.com/weavejester/cljfmt)       |
 | kibit         | Statically analyse clj/cljs and give suggestions                                          |
+
+
+## Acknowledgements
+
+ - Electron project template - https://github.com/ducky427/electron-template
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2015 Rohit Aggarwal
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+```
+
+ - https://news.ycombinator.com/item?id=10844862 for inspiring me to implement
+   the same project again :)
+
+# Basic Proof of Concept usage
+
+## Generating indices
+
+The following steps allow generating a searchable Stack Overflow Python questions
+index, and browsing some documentation from [DevDocs](http://devdocs.io/).
+
+### Stack Overflow index
+ - (1) Install Lucene++ from https://github.com/luceneplusplus/LucenePlusPlus
+ - (2) Download `stackoverflow.com-Posts.7z` and `stackoverflow.com-Comments.7z` from
+    the torrent at https://archive.org/details/stackexchange
+ - (3) Build `sogrep` with `cd sogrep`, `cmake .`, `make`
+ - (4) In the directory with `7z` files from 1, run
+```
+(7z x -so  stackoverflow.com-Posts.7z  Posts.xml ; \
+ echo -en '\x00'; \
+ 7z x -so  stackoverflow.com-Comments.7z  Comments.xml ) \
+     | path/to/sogrep
+```
+It will generate a `python` directory containing a leveldb database with SO posts.
+ - (5) In `zest/core.cljs` and `app/index.js` change the
+    `/Users/jkozera/Downloads/stackexchange/python` path
+    to the one from above.
+ - (6) Build `nodelucene` with `node-gyp`. To build it for Electron, something like this
+    worked for me:
+```
+HOME=~/.electron-gyp node-gyp rebuild --target=0.35.2 --arch=x64 --dist-url=https://atom.io/download/atom-shell
+```
+You may need to change your Electron version above accordingly.
+ - (7) Run `app/index.js` (note it may require building a different version of `nodelucene`
+    than for Electron)
+    It will generate a `SOPython` directory with full text search index. Move it to
+    `app/SOPython` unless it's already there.
+
+### DevDocs
+ - (1) Run `thor docs:download --all` from https://github.com/Thibaut/devdocs
+ - (2) Copy some directory of your choice from `public/docs` from your `devdocs`
+    directory to `'/Users/[username]/Library/Application Support/zest/docs/`
+    (for OSX, other OSs will have different paths)
+
+This should cover all use cases available in the proof of concept. Obviously all
+these steps need to be automated, and hardcoded paths made configurable.

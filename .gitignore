@@ -26,3 +26,10 @@ node_modules
 *.iml
 SearchIndex
 app/build
+sogrep/sogrep
+sogrep/Makefile
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+build
+app/SOPython
