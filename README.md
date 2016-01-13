@@ -1,6 +1,8 @@
 
 # zest
 
+Early Proof of Concept prototype. Contains hardcoded paths to my home directory, is my first ClojureScript project ever, etc. Not meant for release, published just in case someone wants to collaborate.
+
 ## Requirements
 
 * JDK 1.7+
