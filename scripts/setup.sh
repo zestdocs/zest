@@ -15,6 +15,8 @@ else
   npm install --no-optional
 fi
 
+ELECTRON_VERSION=$(grep 'electron_version = ' Gruntfile.js  | cut -d '"' -f 2)
+HOME=~/.electron-gyp node-gyp rebuild --target=$ELECTRON_VERSION --arch=x64 --dist-url=https://atom.io/download/atom-shell
 
 echo; echo "Installing grunt and bower..."
 

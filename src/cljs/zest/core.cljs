@@ -64,7 +64,7 @@
      query (reagent/atom "")
      input-focus (reagent/atom false)
      focus-id (reagent/atom nil)
-     LuceneIndex (.-LuceneIndex (.require js/window "./build/Release/nodelucene"))
+     LuceneIndex (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
      search-index (LuceneIndex. "app/SOPython")
 
      fts-results

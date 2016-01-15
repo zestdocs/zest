@@ -20,7 +20,7 @@ var exe = {
 };
 
 var electron_path = "electron";
-var electron_version = "0.35.2";
+var electron_version = "0.36.4";
 
 var packageJson = require(__dirname + '/package.json');
 

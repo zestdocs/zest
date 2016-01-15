@@ -1,4 +1,4 @@
-var nodelucene = require("./build/Release/nodelucene")
+var nodelucene = require("../build/Release/nodelucene")
 var idx = new nodelucene.LuceneIndex('SOPython');
 idx.startWriting();
 var levelup = require('levelup')

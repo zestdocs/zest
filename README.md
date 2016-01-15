@@ -7,7 +7,8 @@ Early Proof of Concept prototype. Contains hardcoded paths to my home directory,
 
 * JDK 1.7+
 * Leiningen 2.5.3
-* node.js 4.1.1 [This is done to match the verion of node.js being used in Electron v0.35.2]
+* Recent node.js
+* Lucene++ (available at https://github.com/luceneplusplus/LucenePlusPlus)
 * [NSIS](http://nsis.sourceforge.net/)
 
 On Mac/Linux, installing node.js using [Node Version Manager](https://github.com/creationix/nvm) is recommended.
@@ -179,11 +180,10 @@ The following steps allow generating a searchable Stack Overflow Python question
 index.
 
 ### Stack Overflow index
- - (1) Install Lucene++ from https://github.com/luceneplusplus/LucenePlusPlus
- - (2) Download `stackoverflow.com-Posts.7z` and `stackoverflow.com-Comments.7z` from
+ - (1) Download `stackoverflow.com-Posts.7z` and `stackoverflow.com-Comments.7z` from
     the torrent at https://archive.org/details/stackexchange
- - (3) Build `sogrep` with `cd sogrep`, `cmake .`, `make`
- - (4) In the directory with `7z` files from 1, run
+ - (2) Build `sogrep` with `cd sogrep`, `cmake .`, `make`
+ - (3) In the directory with `7z` files from 1, run
 ```
 (7z x -so  stackoverflow.com-Posts.7z  Posts.xml ; \
  echo -en '\x00'; \
@@ -191,19 +191,15 @@ index.
      | path/to/sogrep
 ```
 It will generate a `python` directory containing a leveldb database with SO posts.
- - (5) In `zest/core.cljs` and `app/index.js` change the
+ - (4) In `zest/core.cljs` and `app/index.js` change the
     `/Users/jkozera/Downloads/stackexchange/python` path
     to the one from above.
- - (6) Build `nodelucene` with `node-gyp`. To build it for Electron, something like this
-    worked for me:
-```
-HOME=~/.electron-gyp node-gyp rebuild --target=0.35.2 --arch=x64 --dist-url=https://atom.io/download/atom-shell
-```
-You may need to change your Electron version above accordingly.
- - (7) Run `app/index.js` (note it may require building a different version of `nodelucene`
-    than for Electron)
+ - (5) Run `app/index.js` (note it may require building a different version of `nodelucene`
+    than for Electron - see (5.1) below)
     It will generate a `SOPython` directory with full text search index. Move it to
     `app/SOPython` unless it's already there.
+ - (5.1) If (5) failed, it means your nodejs version is different from Electron's.
+    You can rebuild nodelucene for your nodejs by running `node-gyp rebuild`:
 
 This should cover all use cases available in the proof of concept. Obviously all
 these steps need to be automated, and hardcoded paths made configurable.
