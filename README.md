@@ -171,10 +171,12 @@ furnished to do so, subject to the following conditions:
 
 # Basic Proof of Concept usage
 
-## Generating indices
+DevDocs downloader is now implemented in the "Settings" modal.
+
+## Generating Stack Overflow index
 
 The following steps allow generating a searchable Stack Overflow Python questions
-index, and browsing some documentation from [DevDocs](http://devdocs.io/).
+index.
 
 ### Stack Overflow index
  - (1) Install Lucene++ from https://github.com/luceneplusplus/LucenePlusPlus
@@ -202,12 +204,6 @@ You may need to change your Electron version above accordingly.
     than for Electron)
     It will generate a `SOPython` directory with full text search index. Move it to
     `app/SOPython` unless it's already there.
-
-### DevDocs
- - (1) Run `thor docs:download --all` from https://github.com/Thibaut/devdocs
- - (2) Copy some directory of your choice from `public/docs` from your `devdocs`
-    directory to `'/Users/[username]/Library/Application Support/zest/docs/`
-    (for OSX, other OSs will have different paths)
 
 This should cover all use cases available in the proof of concept. Obviously all
 these steps need to be automated, and hardcoded paths made configurable.

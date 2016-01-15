@@ -1,7 +1,9 @@
 (ns zest.core
   (:require [reagent.core :as reagent]
             [cljsjs.react]
-            [goog.net.XhrIo]))
+            [goog.net.XhrIo]
+            [zest.settings]
+            [zest.docs.registry]))
 
 (defn unfluff
   [html]
@@ -18,26 +20,34 @@
 (defn main-page
   []
   (let
-    [electron (.require js.window "electron")
-     path (.require js/window "path")
+    [path (.require js/window "path")
      fs (.require js/window "fs")
      levelup (.require js/window "levelup")
      escape-html (.require js/window "escape-html")
-     docsets-root (.join path (.getDataPath (.-app (.-remote electron))) "docs")
      docset-types (reagent/atom (hash-map))
-     docsets-list (.readdirSync fs docsets-root)
+     devdocs-root (zest.docs.registry/get-devdocs-root)
+     docsets-list zest.docs.registry/installed-devdocs-atom
      docset-type-items (reagent/atom (hash-map))
      splitjs (.require js/window "split.js")
      index (reagent/atom 0)
+     docset-db-cache (js-obj)
      docset-cache (js-obj)
+
      get-from-cache
      (fn [dir]
        (if (nil? (aget docset-cache dir))
          (let [json (.parse js/JSON
                             (.readFileSync
                               (.require js/window "fs")
-                              (.join path docsets-root dir "index.json") "utf8"))]
+                              (.join path devdocs-root dir "index.json") "utf8"))]
+
+
            (aset docset-cache dir json)
+           (aset docset-db-cache dir
+                 (.parse js/JSON (.readFileSync
+                                   fs
+                                   (.join path devdocs-root dir "db.json")
+                                   "utf8")))
            json)
          (aget docset-cache dir)))
 
@@ -47,12 +57,11 @@
             (.-entries (get-from-cache dir))))
 
      entries (reagent/atom
-               (apply concat (map (fn [x] (get-entries x)) docsets-list)))
+               (apply concat (map (fn [x] (get-entries x)) @docsets-list)))
      results (reagent/atom [])
      search-results (reagent/atom [])
      html (reagent/atom "")
      query (reagent/atom "")
-     width (reagent/atom "100%")
      input-focus (reagent/atom false)
      focus-id (reagent/atom nil)
      LuceneIndex (.-LuceneIndex (.require js/window "./build/Release/nodelucene"))
@@ -144,25 +153,18 @@
 
      activate-item
      (fn [docset entry]
-       (.readFile
-         fs
-         (str (.join path
-                     docsets-root
-                     docset
-                     (nth (.split (.-path entry) "#") 0))
-              ".html")
-         "utf8"
-         (fn [err response]
-           (let [new-hash (nth (.split (.-path entry) "#") 1)]
-             (if (= @html response)
-               (do
-                 (set-hash new-hash)
-                 (set-600ms-focus))
+       (let [response (aget (aget docset-db-cache docset)
+                            (nth (.split (.-path entry) "#") 0))]
+         (let [new-hash (nth (.split (.-path entry) "#") 1)]
+           (if (= @html response)
+             (do
+               (set-hash new-hash)
+               (set-600ms-focus))
 
-               (do
-                 (reset! hash new-hash)
-                 (async-set-html response #(set-hash new-hash))
-                 (set-600ms-focus)))))))
+             (do
+               (reset! hash new-hash)
+               (async-set-html response #(set-hash new-hash))
+               (set-600ms-focus))))))
 
      section
      (fn [docset type]
@@ -207,11 +209,11 @@
              results
              (concat
                (take 10 (filter
-                           (fn [r]
-                             (=
-                               (.indexOf (.-name (.-contents r)) q)
-                               0))
-                           @entries))))
+                          (fn [r]
+                            (=
+                              (.indexOf (.-name (.-contents r)) q)
+                              0))
+                          @entries))))
            (reset! index 0))))]
 
     (reagent/create-class
@@ -257,7 +259,7 @@
            [:div {:class "tree"}
             (if (= 0 (count @results))
               (doall (for [docset
-                           (map (fn [x] {:name x :label x}) docsets-list)]
+                           (map (fn [x] {:name x :label x}) @docsets-list)]
                        ^{:key (:name docset)}
                        [:div
                         [:h2 [:a
@@ -296,11 +298,21 @@
                                       (.focus (.getElementById js/document "searchInput")))}]
                         [:span {:class "button toggle"} (.-name (.-contents item))]])))
             (if (> (count @query) 0) (fts-suggestions))]]
-          [right-class]])})))
+          [right-class]
+          [zest.settings/register-settings]])})))
 
 (defn mount-root
   []
-  (reagent/render [main-page] (.getElementById js/document "app")))
+  (set! (.-onkeydown js/document)
+        (fn [e]
+          (if (= (.-keyCode e) 27)
+            (let [modals (.querySelectorAll js/document ".modal > [type=checkbox]")]
+              (doall (for [modal (aclone modals)]
+                       (do
+                         (set! (.-checked modal) false))))))))
+  (reagent/render
+    [main-page]
+    (.getElementById js/document "app")))
 
 (defn init!
   []
