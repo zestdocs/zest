@@ -1,5 +1,7 @@
 (ns zest.settings
-  (:require [reagent.core :as reagent]
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [cljs.core.async :as async]
+            [reagent.core :as reagent]
             [zest.docs.registry]))
 
 (def visible (reagent/atom false))
@@ -26,8 +28,7 @@
           (.writeFileSync fs (.join path doc-dir "index.json") @index-data)
           (.writeFileSync fs (.join path doc-dir "db.json") @db-data)
           (reset! downloading (dissoc @downloading slug))
-          (reset! zest.docs.registry/installed-devdocs-atom
-                  (zest.docs.registry/get-installed-devdocs)))]
+          (zest.docs.registry/update-installed-devdocs))]
 
     (reset! downloading (assoc @downloading slug 0))
     (request (str "http://maxcdn-docs.devdocs.io/" slug "/index.json")
@@ -99,9 +100,7 @@
                               (.join path
                                      (zest.docs.registry/get-devdocs-root)
                                      doc)
-                              (fn []
-                                (reset! zest.docs.registry/installed-devdocs-atom
-                                        (zest.docs.registry/get-installed-devdocs)))))}
+                              #(zest.docs.registry/update-installed-devdocs)))}
                          "remove"]]))]]
             [:div {:class "half"}
              [:h3 "Available documentation"]

@@ -1,5 +1,7 @@
 (ns zest.docs.registry
-  (:require [reagent.core :as reagent]))
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [reagent.core :as reagent]
+            [cljs.core.async :as async]))
 
 (defn get-devdocs-root []
   (let [electron (.require js.window "electron")
@@ -21,9 +23,9 @@
         fetch
         (fn []
           (request "https://devdocs.io/docs.json"
-            (fn [error response body]
-              (.writeFileSync fs devdocs-json body)
-              (cb (.parse js/JSON body)))))]
+                   (fn [error response body]
+                     (.writeFileSync fs devdocs-json body)
+                     (cb (.parse js/JSON body)))))]
 
     (.sync mkdirp (get-devdocs-root))
     (if (and (.existsSync fs devdocs-json)
@@ -46,4 +48,11 @@
     (.readdirSync fs (get-devdocs-root))))
 
 (def installed-devdocs-atom (reagent/atom
-                               (zest.docs.registry/get-installed-devdocs)))
+                              (zest.docs.registry/get-installed-devdocs)))
+
+(def installed-devdocs-chan (async/chan))
+
+(defn update-installed-devdocs []
+  (let [installed (get-installed-devdocs)]
+    (go (async/>! installed-devdocs-chan installed))
+    (reset! installed-devdocs-atom installed)))

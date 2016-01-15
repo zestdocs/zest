@@ -8,6 +8,7 @@
 
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.228"]
+                 [org.clojure/core.async "0.2.374"]
                  [cljsjs/react "0.13.3-1"]
                  [cljsjs/nodejs-externs "1.0.4-1"]
                  [reagent "0.5.1"]]
@@ -32,7 +33,7 @@
                                               :compiler {:source-map true
                                                          :main       "zest.dev"
                                                          :verbose true}
-                                              :figwheel {:on-jsload "zest.core/mount-root"}}}}
+                                              :figwheel {:on-jsload "zest.core/on-figwheel-reload"}}}}
                    :source-paths ["env/dev/cljs"]
 
                    :dependencies [[figwheel-sidecar "0.5.0-3"]]

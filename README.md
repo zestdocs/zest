@@ -71,7 +71,7 @@ user> (def figwheel-config
          :build-ids ["dev"]
          :all-builds
            [{:id "dev"
-             :figwheel {:on-jsload "zest.core/mount-root"}
+             :figwheel {:on-jsload "zest.core/on-figwheel-reload"}
              :source-paths ["src/cljs" "env/dev/cljs"]
              :compiler {:main "zest.dev"
                         :asset-path "js/p/out"

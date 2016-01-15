@@ -1,5 +1,7 @@
 (ns zest.core
+  (:require-macros [cljs.core.async.macros :refer [go-loop]])
   (:require [reagent.core :as reagent]
+            [cljs.core.async :as async]
             [cljsjs.react]
             [goog.net.XhrIo]
             [zest.settings]
@@ -17,55 +19,80 @@
     (.write parser html)
     @res))
 
+(def search-index
+  (let [LuceneIndex
+        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
+    (LuceneIndex. "app/SOPython")))
+
+(def query (reagent/atom ""))
+(def results (reagent/atom []))
+(def search-results (reagent/atom []))
+(def index (reagent/atom 0))
+
+(def docset-db-cache (js-obj))
+(def docset-cache (js-obj))
+
+(defn get-from-cache [dir]
+  (if (nil? (aget docset-cache dir))
+    (let [path (.require js/window "path")
+          fs (.require js/window "fs")
+          devdocs-root (zest.docs.registry/get-devdocs-root)
+          json (.parse js/JSON
+                       (.readFileSync
+                         (.require js/window "fs")
+                         (.join path devdocs-root dir "index.json") "utf8"))]
+
+
+      (aset docset-cache dir json)
+      (aset docset-db-cache dir
+            (.parse js/JSON (.readFileSync
+                              fs
+                              (.join path devdocs-root dir "db.json")
+                              "utf8")))
+      json)
+    (aget docset-cache dir)))
+
+(defn get-entries [dir]
+  (map #(js-obj "docset" dir "contents" %)
+       (.-entries (get-from-cache dir))))
+
+(defn get-all-entries [data]
+  (apply concat (map (fn [x] (get-entries x)) data)))
+
+(def entries
+  (reagent/atom (get-all-entries @zest.docs.registry/installed-devdocs-atom)))
+
+(defn set-query [q]
+  (reset! query q)
+  (if (= (count q) 0)
+    (reset! results [])
+    (do
+      (reset! search-results (.search search-index @query))
+      (if (= (count @search-results) 0)
+        (reset! search-results (.search search-index (str @query "*"))))
+      (reset!
+        results
+        (concat
+          (take 10 (filter
+                     (fn [r]
+                       (=
+                         (.indexOf (.-name (.-contents r)) q)
+                         0))
+                     @entries))))
+      (reset! index 0))))
+
 (defn main-page
   []
   (let
-    [path (.require js/window "path")
-     fs (.require js/window "fs")
-     levelup (.require js/window "levelup")
+    [levelup (.require js/window "levelup")
      escape-html (.require js/window "escape-html")
      docset-types (reagent/atom (hash-map))
-     devdocs-root (zest.docs.registry/get-devdocs-root)
      docsets-list zest.docs.registry/installed-devdocs-atom
      docset-type-items (reagent/atom (hash-map))
      splitjs (.require js/window "split.js")
-     index (reagent/atom 0)
-     docset-db-cache (js-obj)
-     docset-cache (js-obj)
-
-     get-from-cache
-     (fn [dir]
-       (if (nil? (aget docset-cache dir))
-         (let [json (.parse js/JSON
-                            (.readFileSync
-                              (.require js/window "fs")
-                              (.join path devdocs-root dir "index.json") "utf8"))]
-
-
-           (aset docset-cache dir json)
-           (aset docset-db-cache dir
-                 (.parse js/JSON (.readFileSync
-                                   fs
-                                   (.join path devdocs-root dir "db.json")
-                                   "utf8")))
-           json)
-         (aget docset-cache dir)))
-
-     get-entries
-     (fn [dir]
-       (map #(js-obj "docset" dir "contents" %)
-            (.-entries (get-from-cache dir))))
-
-     entries (reagent/atom
-               (apply concat (map (fn [x] (get-entries x)) @docsets-list)))
-     results (reagent/atom [])
-     search-results (reagent/atom [])
      html (reagent/atom "")
-     query (reagent/atom "")
      input-focus (reagent/atom false)
      focus-id (reagent/atom nil)
-     LuceneIndex (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
-     search-index (LuceneIndex. "app/SOPython")
 
      fts-results
      (fn [files cb]
@@ -194,27 +221,7 @@
                                             (fn [res] ^{:key res}
                                             [:li [:a (nth (.split res ";") 1)]])
                                             @search-results)]])
-         [:div]))
-
-     set-query
-     (fn [q]
-       (reset! query q)
-       (if (= (count q) 0)
-         (reset! results [])
-         (do
-           (reset! search-results (.search search-index @query))
-           (if (= (count @search-results) 0)
-             (reset! search-results (.search search-index (str @query "*"))))
-           (reset!
-             results
-             (concat
-               (take 10 (filter
-                          (fn [r]
-                            (=
-                              (.indexOf (.-name (.-contents r)) q)
-                              0))
-                          @entries))))
-           (reset! index 0))))]
+         [:div]))]
 
     (reagent/create-class
       {
@@ -314,6 +321,21 @@
     [main-page]
     (.getElementById js/document "app")))
 
+(defn make-devdocs-loop []
+  (.log js/console "make-devdocs-loop")
+  (go-loop []
+           (let [data (async/<! zest.docs.registry/installed-devdocs-chan)]
+             (reset! entries (get-all-entries data))
+             (if (> (count @query) 0)
+               (set-query @query))
+             (recur))))
+
+(def devdocs-loop (make-devdocs-loop))
+
 (defn init!
   []
+  (mount-root))
+
+(defn on-figwheel-reload []
+  (async/close! devdocs-loop)
   (mount-root))
