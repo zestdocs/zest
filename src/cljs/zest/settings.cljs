@@ -17,6 +17,7 @@
 (def so-ul-speed (reagent/atom 0))
 (def so-grep-progress (reagent/atom nil))
 (def so-index-progress (reagent/atom nil))
+(def so-index-tags (reagent/atom #{}))
 (def so-archives-total (reagent/atom 0))
 (def so-archives-available
   (let [fs (.require js/window "fs")
@@ -43,7 +44,9 @@
    "django"
    "html"
    "c++"
-   "ios"])
+   "ios"
+   "objective-c"
+   "clojure"])
 
 (defn start-so-download []
   (let [WebTorrent (.require js/window "webtorrent")
@@ -122,12 +125,14 @@
                                     (nth (.split line #"\s+") 3)))))))))
     ret))
 
-(defn start-so-indexing [tag]
+(defn start-so-indexing []
   (reset! so-index-progress 0)
   (let [levelup (.require js/window "levelup")
         path (.require js/window "path")
+        fs (.require js/window "fs")
+        rimraf (.require js/window "rimraf")
         db (levelup.
-             (.join path (zest.docs.registry/get-so-root) "leveldb"))
+             (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb"))
         rStream (.createReadStream
                   db
                   (js-obj "gt" "p_"
@@ -136,7 +141,7 @@
         LuceneIndex
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
         idx (LuceneIndex. (.join path (zest.docs.registry/get-so-root)
-                                 "lucene"))
+                                 "new_index" "lucene"))
 
         done (atom 0)
         started (atom 0)
@@ -144,7 +149,16 @@
         check-all-done
         (fn []
           (if (and @ended (= @started @done))
-            (.endWriting idx)))
+            (do
+              (.endWriting idx)
+              (.sync rimraf (.join path (zest.docs.registry/get-so-root) "lucene"))
+              (.sync rimraf (.join path (zest.docs.registry/get-so-root) "leveldb"))
+              (.renameSync
+                (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
+                (.join path (zest.docs.registry/get-so-root) "lucene"))
+              (.renameSync
+                (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
+                (.join path (zest.docs.registry/get-so-root) "leveldb")))))
 
         auf
         (fn [answer]
@@ -224,20 +238,23 @@
            (reset! ended true)
            (check-all-done)))))
 
-(defn start-so-grepping [tag]
+(defn start-so-grepping []
   (let [mkdirp (.require js/window "mkdirp")
+        rimraf (.require js/window "rimraf")
         path (.require js/window "path")]
-    (.sync mkdirp (.join path (zest.docs.registry/get-so-root) tag))
+    (.sync rimraf (.join path (zest.docs.registry/get-so-root) "new_index"))
+    (.sync mkdirp (.join path (zest.docs.registry/get-so-root) "new_index"))
     (go (let [comments-size (async/<! (archive-size "Comments"))
               posts-size (async/<! (archive-size "Posts"))
               child-process (.require js/window "child_process")
               Lazy (.require js/window "lazy")
               Buffer (.-Buffer (.require js/window "buffer"))
               sogrep (.spawn child-process "sogrep"
-                             (array tag)
+                             (apply array @so-index-tags)
                              (js-obj "cwd"
                                      (.join path
-                                            (zest.docs.registry/get-so-root))))
+                                            (zest.docs.registry/get-so-root)
+                                            "new_index")))
               p7zip-posts (open-so-archive "Posts" "x")]
           (reset! so-indexing true)
           (.pipe (.-stdout p7zip-posts)
@@ -251,7 +268,7 @@
           (.on sogrep "close"
                (fn [code]
                  (.log js/console "sogrep exited with code" code)
-                 (if (= 0 code) (start-so-indexing tag))))
+                 (if (= 0 code) (start-so-indexing))))
           (.on p7zip-posts "close"
                (fn [code]
                  (.log js/console "7z x posts exited with code" code)
@@ -274,31 +291,39 @@
 (defn so-widget []
   (if @so-archives-available
     [:div
-     [:p "Suggested tags:"]
+     [:p "Suggested tags (select ones you want in your index):"]
      [:ul
       (doall (for [tag suggested-tags]
-               (if (nil? @so-grep-progress)
-                 (if (not @so-indexing)
-                   (do ^{:key (str "so_tags_" tag)}
-                       [:li (str tag " | ")
-                        [:a
-                         {:on-click #(start-so-grepping tag)}
-                         "generate index"]])
-                   (do
-                     ^{:key (str "so_tags_" tag)}
-                     [:li (str tag)]))
-                 (doall
-                   ^{:key (str "so_indexing_" tag)}
-                   [:li (str
-                          "Indexing " tag ": "
-                          (.toFixed
-                            (min 99.99                      ; never show 100%
-                                 (* 100 (/ @so-grep-progress
-                                           @so-archives-total)))
-                            2)
-                          "% filtering, "
-                          (or @so-index-progress 0)
-                          " indexing")]))))]]
+               (do ^{:key (str "so_tags_" tag)}
+                   [:li
+                    [:label
+                     [:input {:type     "checkbox"
+                              :checked  (get @so-index-tags tag)
+                              :disabled @so-indexing
+                              :on-change
+                                        (fn []
+                                          (if (nil? (get @so-index-tags tag))
+                                            (reset! so-index-tags
+                                                    (conj @so-index-tags tag))
+                                            (reset! so-index-tags
+                                                    (disj @so-index-tags tag))))}]
+                     [:span {:class "checkable"} tag]]]
+                   )))]
+     (if @so-indexing
+       [:p (str
+             "Indexing : "
+             (.toFixed
+               (* 100 (/ (or @so-grep-progress 0)
+                         (or @so-archives-total 1)))
+               2)
+             "% filtering, "
+             (or @so-index-progress 0)
+             " indexing")]
+       [:button {:on-click (fn []
+                             (reset! so-indexing true)
+                             (start-so-grepping))}
+        "Create index"])]
+
     [:div
      [:p "~8GB BitTorrent download required. (provided by archive.org)"]
      (if @so-downloading
