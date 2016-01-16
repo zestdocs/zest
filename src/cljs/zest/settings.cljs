@@ -166,7 +166,7 @@
 
         auf
         (fn [answer]
-          (let [ret-data (atom (.-Body answer))
+          (let [ret-data (atom (zest.core/unfluff (.-Body answer)))
                 ret (async/chan)
                 cStream (.createReadStream
                           db
@@ -175,7 +175,7 @@
             (.on cStream "data"
                  (fn [v]
                    (let [comment (.parse js/JSON (.-value v))]
-                     (reset! ret-data (str ret-data " " (.-Text comment))))))
+                     (reset! ret-data (str @ret-data " " (.-Text comment))))))
 
             (.on cStream "end"
                  (fn []
@@ -202,7 +202,7 @@
             (.on cStream "data"
                  (fn [v]
                    (let [comment (.parse js/JSON (.-value v))]
-                     (reset! ret-data (str ret-data " " (.-Text comment))))))
+                     (reset! ret-data (str @ret-data " " (.-Text comment))))))
 
             (.on cStream "end"
                  (fn []
@@ -215,10 +215,10 @@
                             (reset! started (+ @started 1))
                             (let [answer (.parse js/JSON (.-value v))]
                               (go
-                                (reset! ret-data (str @ret-data
-                                                      (async/<! (auf answer))))
-                                (reset! finished (+ @finished 1))
-                                (check-finished)))))
+                                (let [ans-data (async/<! (auf answer))]
+                                  (reset! ret-data (str @ret-data ans-data))
+                                  (reset! finished (+ @finished 1))
+                                  (check-finished))))))
                      (.on aStream "end"
                           (fn []
                             (reset! ended true)

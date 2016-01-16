@@ -1,5 +1,5 @@
 (ns zest.core
-  (:require-macros [cljs.core.async.macros :refer [go-loop]])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async]
             [cljsjs.react]
@@ -24,6 +24,12 @@
         LuceneIndex
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
     (LuceneIndex. (.join path (zest.docs.registry/get-so-root) "lucene"))))
+
+(def so-db
+  (let [levelup (.require js/window "levelup")
+        path (.require js/window "path")]
+    (levelup (.join path (zest.docs.registry/get-so-root)
+                    "leveldb"))))
 
 (def query (reagent/atom ""))
 (def results (reagent/atom []))
@@ -85,11 +91,70 @@
                      @entries))))
       (reset! index 0))))
 
+(defn render-so-post [data]
+  (let [process-answer
+        (fn [answer]
+          (let [ret-data (atom (.-Body answer))
+                ret (async/chan)
+                cStream (.createReadStream
+                          so-db
+                          (js-obj "gt" (str "c_" (.-Id answer) "_")
+                                  "lt" (str "c_" (.-Id answer) "_a")))]
+            (.on cStream "data"
+                 (fn [v]
+                   (let [comment (.parse js/JSON (.-value v))]
+                     (reset! ret-data (str @ret-data " " (.-Text comment))))))
+
+            (.on cStream "end"
+                 (fn []
+                   (go (async/>! ret @ret-data))))
+            ret))
+
+        ret-data (atom (str (.-Title data) " " (.-Body data)))
+        ret (async/chan)
+        started (atom 0)
+        finished (atom 0)
+        ended (atom false)
+        cStream (.createReadStream
+                  so-db
+                  (js-obj "gt" (str "c_" (.-Id data) "_")
+                          "lt" (str "c_" (.-Id data) "_a")))
+        check-finished
+        (fn []
+          (if (and (= @started @finished) @ended)
+                        (go (async/>! ret @ret-data))))]
+
+    (.on cStream "data"
+         (fn [v]
+           (let [comment (.parse js/JSON (.-value v))]
+             (reset! ret-data (str @ret-data " " (.-Text comment))))))
+
+    (.on cStream "end"
+         (fn []
+           (let [aStream (.createReadStream
+                           so-db
+                           (js-obj "gt" (str "a_" (.-Id data) "_")
+                                   "lt" (str "a_" (.-Id data) "_a")))]
+             (.on aStream "data"
+                  (fn [v]
+                    (reset! started (+ @started 1))
+                    (let [answer (.parse js/JSON (.-value v))]
+                      (go
+                        (let [ans-data (async/<!
+                                         (process-answer answer))]
+                          (reset! ret-data (str @ret-data ans-data)))
+                          (reset! finished (+ @finished 1))
+                          (check-finished)))))
+             (.on aStream "end"
+                  (fn []
+                    (reset! ended true)
+                    (check-finished))))))
+    ret))
+
 (defn main-page
   []
   (let
-    [levelup (.require js/window "levelup")
-     escape-html (.require js/window "escape-html")
+    [escape-html (.require js/window "escape-html")
      docset-types (reagent/atom (hash-map))
      docsets-list zest.docs.registry/installed-devdocs-atom
      docset-type-items (reagent/atom (hash-map))
@@ -104,13 +169,11 @@
          [res (reagent/atom "")
           i (reagent/atom 0)
           path (.require js/window "path")
-          so-python (levelup (.join path (zest.docs.registry/get-so-root)
-                                    "leveldb"))
 
           next
           (fn next []
             (.get
-              so-python
+              so-db
               (nth (.split (nth files @i) ";") 0)
               (fn [e ret]
                 (reset!
@@ -124,7 +187,7 @@
                       @query)))
                 (if (< @i (- (count files) 1))
                   (do (reset! i (+ @i 1)) (next))
-                  (do (cb @res) (.close so-python))))))]
+                  (do (cb @res))))))]
          (next)))
 
      set-600ms-focus
@@ -186,18 +249,27 @@
 
      activate-item
      (fn [docset entry]
-       (let [response (aget (aget docset-db-cache docset)
-                            (nth (.split (.-path entry) "#") 0))]
-         (let [new-hash (nth (.split (.-path entry) "#") 1)]
-           (if (= @html response)
-             (do
-               (set-hash new-hash)
-               (set-600ms-focus))
+       (if (= docset "stackoverflow")
+         (let []
+           (.log js/console entry)
+           (.get
+             so-db
+             (str "p_" entry)
+             (fn [e json]
+               (let [data (.parse js/JSON json)]
+                 (go (async-set-html (async/<! (render-so-post data))#()))))))
+         (let [response (aget (aget docset-db-cache docset)
+                              (nth (.split (.-path entry) "#") 0))]
+           (let [new-hash (nth (.split (.-path entry) "#") 1)]
+             (if (= @html response)
+               (do
+                 (set-hash new-hash)
+                 (set-600ms-focus))
 
-             (do
-               (reset! hash new-hash)
-               (async-set-html response #(set-hash new-hash))
-               (set-600ms-focus))))))
+               (do
+                 (reset! hash new-hash)
+                 (async-set-html response #(set-hash new-hash))
+                 (set-600ms-focus)))))))
 
      section
      (fn [docset type]
@@ -223,10 +295,15 @@
          (do [:div {:class "fts"}
               [:h2 "See also"]
               [:h3 "Stack Overflow:"]
-              [:ul {:class "fts-results"} (map
-                                            (fn [res] ^{:key res}
-                                            [:li [:a (nth (.split res ";") 1)]])
-                                            @search-results)]])
+              [:ul {:class "fts-results"}
+               (map
+                 (fn [res] ^{:key res}
+                 [:li
+                  [:a
+                   {:on-click #(activate-item "stackoverflow"
+                                              (nth (.split res ";") 0))}
+                   (nth (.split res ";") 1)]])
+                 @search-results)]])
          [:div]))]
 
     (reagent/create-class
@@ -338,10 +415,26 @@
 
 (def devdocs-loop (make-devdocs-loop))
 
-(defn init!
-  []
-  (mount-root))
+(defn before-figwheel-reload []
+  (.log js/console "before")
+  (.close so-db)
+  (.removeEventListener
+    (.-body js/document)
+    "figwheel.before-js-reload"
+    before-figwheel-reload)
+  (async/close! devdocs-loop))
+
+(defn add-figwheel-handler []
+  (.addEventListener
+    (.-body js/document)
+    "figwheel.before-js-reload"
+    before-figwheel-reload))
 
 (defn on-figwheel-reload []
-  (async/close! devdocs-loop)
+  (add-figwheel-handler)
+  (mount-root))
+
+(defn init!
+  []
+  (add-figwheel-handler)
   (mount-root))

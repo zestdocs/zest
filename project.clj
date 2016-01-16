@@ -33,7 +33,8 @@
                                               :compiler {:source-map true
                                                          :main       "zest.dev"
                                                          :verbose true}
-                                              :figwheel {:on-jsload "zest.core/on-figwheel-reload"}}}}
+                                              :figwheel {:on-jsload "zest.core/on-figwheel-reload"
+                                                         :before-js-reload "zest.core/before-figwheel-reload"}}}}
                    :source-paths ["env/dev/cljs"]
 
                    :dependencies [[figwheel-sidecar "0.5.0-3"]]
