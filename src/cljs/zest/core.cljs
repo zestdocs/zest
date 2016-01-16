@@ -20,9 +20,10 @@
     @res))
 
 (def search-index
-  (let [LuceneIndex
+  (let [path (.require js/window "path")
+        LuceneIndex
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
-    (LuceneIndex. "app/SOPython")))
+    (LuceneIndex. (.join path (zest.docs.registry/get-so-root) "lucene"))))
 
 (def query (reagent/atom ""))
 (def results (reagent/atom []))
@@ -99,7 +100,9 @@
        (let
          [res (reagent/atom "")
           i (reagent/atom 0)
-          so-python (levelup "/Users/jkozera/Downloads/stackexchange/python")
+          path (.require js/window "path")
+          so-python (levelup (.join path (zest.docs.registry/get-so-root)
+                                    "leveldb"))
 
           next
           (fn next []
@@ -216,7 +219,7 @@
        (if (> (count @search-results) 0)
          (do [:div {:class "fts"}
               [:h2 "See also"]
-              [:h3 "Python Stack Overflow:"]
+              [:h3 "Stack Overflow:"]
               [:ul {:class "fts-results"} (map
                                             (fn [res] ^{:key res}
                                             [:li [:a (nth (.split res ";") 1)]])

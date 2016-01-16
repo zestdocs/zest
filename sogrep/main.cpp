@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 #include <rapidjson/writer.h>
@@ -18,7 +19,8 @@ using namespace rapidjson;
 using namespace std;
 using namespace xercesc;
 
-string tagName;
+vector<string> tagNames;
+leveldb::DB* db;
 
 class ZeroSeparatedBinFileInputStream : public BinFileInputStream {
 
@@ -119,77 +121,47 @@ BinInputStream *ZeroPaddedStdInInputSource::makeStream() const {
 }
 
 
-class Answer;
-
-class Item {
-public:
-    map<string, string> base;
-    vector<map<string, string> > comments;
-
-    virtual const vector<Answer*>& getAnswers()=0;
-    virtual bool isQuestion()=0;
-    virtual void addAnswer(Answer* a)=0;
-};
-
-class Answer : public Item {
-    bool isQuestion() { return false; }
-    const vector<Answer*>& getAnswers() { throw exception(); }
-    void addAnswer(Answer* a) { throw exception(); }
-
-};
-
-class Question : public Item {
-    vector<Answer*> answers;
-
-    bool isQuestion() { return true; }
-    const vector<Answer*>& getAnswers() { return answers; }
-    void addAnswer(Answer* a) { answers.push_back(a); }
-};
-
 class MySAXHandler : public HandlerBase {
 
 
     bool comments = false;
 
-    void a2m(AttributeList& attrs, map<string, string>& ret) {
-        for (int i = 0; i < attrs.getLength(); ++i) {
-            const XMLCh* name = attrs.getName(i);
-            ret[XMLString::transcode(name)] = XMLString::transcode(attrs.getValue(name));
-        }
-    }
+    map<string, int> commentCounts;
+    map<string, int> answerCounts;
 
 public:
-
-    map<string, Item*> items;
     void setComments() { comments = true; }
 
-    Question* a2q(AttributeList &attrs) {
-        Question *ret = new Question();
+
+    const std::string jsonize(AttributeList &attrs) {
+        StringBuffer s;
+        Writer<StringBuffer> w(s);
+
+        w.StartObject();
         for (int i = 0; i < attrs.getLength(); ++i) {
             const XMLCh* name = attrs.getName(i);
-            ret->base[XMLString::transcode(name)] = XMLString::transcode(attrs.getValue(name));
+            w.String(XMLString::transcode(name));
+            w.String(XMLString::transcode(attrs.getValue(name)));
         }
-        return ret;
-    }
-    Answer* a2a(AttributeList &attrs) {
-        Answer *ret = new Answer();
-        for (int i = 0; i < attrs.getLength(); ++i) {
-            const XMLCh* name = attrs.getName(i);
-            ret->base[XMLString::transcode(name)] = XMLString::transcode(attrs.getValue(name));
-        }
-        return ret;
+        w.EndObject();
+
+        return s.GetString();
     }
 
     void startElement(const XMLCh* const, AttributeList& attrs) {
         if (attrs.getValue("Id") != nullptr) {
             if (comments) {
-                map<string, Item*>::iterator found = items.find(XMLString::transcode(attrs.getValue("PostId")));
-                if (found != items.end()) {
-                    found->second->comments.push_back(map<string,string>());
-                    a2m(attrs, found->second->comments.back());
+                const string PostId = XMLString::transcode(attrs.getValue("PostId"));
+                map<string, int>::iterator match = commentCounts.find(PostId);
+                if (match != commentCounts.end()) {
+                    db->Put(
+                        leveldb::WriteOptions(),
+                        "c_"+PostId+"_"+std::to_string(match->second),
+                        jsonize(attrs)
+                    );
+                    commentCounts[PostId] += 1;
                 }
             } else {
-                bool ispy = false;
                 const XMLCh* tags = attrs.getValue("Tags");
 
                 if (tags == nullptr) {
@@ -197,22 +169,58 @@ public:
                     if (parentId == nullptr) {
                         return;
                     }
-
-                    ispy = items.find(XMLString::transcode(parentId)) != items.end();
-                } else {
-                    const string tagsStr = XMLString::transcode(tags);
-                    ispy = tagsStr.find("<"+tagName+">") != string::npos;
-                }
-
-                if (ispy) {
-                    const string postType = XMLString::transcode(attrs.getValue("PostTypeId"));
                     const string id = XMLString::transcode(attrs.getValue("Id"));
-                    if (postType == "1") {
-                        items[id] = a2q(attrs);
-                    } else {
-                        Answer* a = a2a(attrs);
-                        items[id] = a;
-                        items[XMLString::transcode(attrs.getValue("ParentId"))]->addAnswer(a);
+                    const string transcodedParentId = XMLString::transcode(parentId);
+                    auto match = answerCounts.find(transcodedParentId);
+                    if (match != answerCounts.end()) {
+                        db->Put(
+                            leveldb::WriteOptions(),
+                            "a_"+transcodedParentId+"_"+std::to_string(match->second),
+                            jsonize(attrs)
+                        );
+                        answerCounts[transcodedParentId] += 1;
+                        commentCounts[id] = 0;
+                    }
+                } else {
+                    bool matches = false;
+
+                    const string tagsStr = XMLString::transcode(tags);
+
+                    for (int i = 0; i < tagNames.size(); ++i) {
+                        matches = tagsStr.find("<"+tagNames[i]+">") != string::npos;
+                        if (matches) break;
+                    }
+
+                    if (matches) {
+                        const string id = XMLString::transcode(attrs.getValue("Id"));
+                        const string postType = XMLString::transcode(attrs.getValue("PostTypeId"));
+
+                        if (postType == "1") {
+                            db->Put(
+                                leveldb::WriteOptions(),
+                                "p_"+id,
+                                jsonize(attrs)
+                            );
+                            answerCounts[id] = 0;
+                            commentCounts[id] = 0;
+                        } else {
+                            const XMLCh* parentId = attrs.getValue("ParentId");
+                            if (parentId == nullptr) {
+                                return;
+                            }
+                            const string transcodedParentId = XMLString::transcode(parentId);
+                            auto match = answerCounts.find(transcodedParentId);
+                            if (match != answerCounts.end()) {
+                                db->Put(
+                                    leveldb::WriteOptions(),
+                                    "a_"+transcodedParentId+"_"+std::to_string(match->second),
+                                    jsonize(attrs)
+                                );
+                                answerCounts[transcodedParentId] += 1;
+                                commentCounts[id] = 0;
+                            }
+                        }
+
                     }
                 }
             }
@@ -222,12 +230,18 @@ public:
 
 
 int main(int argc, const char ** argv) {
-    tagName = argv[1];
+    for (int i = 1; i < argc; ++i) {
+        tagNames.push_back(argv[i]);
+    }
     try {
         XMLPlatformUtils::Initialize();
     } catch (const XMLException& e) {
         return 1;
     }
+
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::DB::Open(options, "leveldb", &db);
 
     SAXParser *parser = new SAXParser();
     MySAXHandler *handler = new MySAXHandler();
@@ -238,74 +252,6 @@ int main(int argc, const char ** argv) {
     ZeroSeparatedBinFileInputStream::next();
     handler->setComments();
     parser->parse(src);
-
-    leveldb::DB* db;
-    leveldb::Options options;
-    options.create_if_missing = true;
-    leveldb::DB::Open(options, "leveldb", &db);
-
-    for (auto it = handler->items.begin(); it != handler->items.end(); ++it) {
-        Item *i = it->second;
-
-        if (!i->isQuestion()) {
-            continue;
-        }
-
-        StringBuffer s;
-        Writer<StringBuffer> w(s);
-        w.StartObject();
-
-        // core question data:
-        for (auto it2 = i->base.begin(); it2 != i->base.end(); ++it2) {
-            w.String(it2->first.c_str());
-            w.String(it2->second.c_str());
-        }
-
-        // answers:
-        w.String("answers");
-        w.StartArray();
-        auto answers = i->getAnswers();
-        for (int j = 0; j < answers.size(); ++j) {
-            auto answer = answers[j];
-            w.StartObject();
-            for (auto it2 = answer->base.begin(); it2 != answer->base.end(); ++it2) {
-                w.String(it2->first.c_str());
-                w.String(it2->second.c_str());
-            }
-
-            // answer comments
-            w.String("comments");
-            w.StartArray();
-            for (auto it2 = answer->comments.begin(); it2 != answer->comments.end(); ++it2) {
-                w.StartObject();
-                for (auto it3 = it2->begin(); it3 != it2->end(); ++it3) {
-                    w.String(it3->first.c_str());
-                    w.String(it3->second.c_str());
-                }
-                w.EndObject();
-            }
-            w.EndArray();
-            w.EndObject();
-        }
-        w.EndArray();
-
-        // comments
-        w.String("comments");
-        w.StartArray();
-        for (auto it2 = i->comments.begin(); it2 != i->comments.end(); ++it2) {
-            w.StartObject();
-            for (auto it3 = it2->begin(); it3 != it2->end(); ++it3) {
-                w.String(it3->first.c_str());
-                w.String(it3->second.c_str());
-            }
-            w.EndObject();
-        }
-        w.EndArray();
-
-        w.EndObject();
-
-        db->Put(leveldb::WriteOptions(), it->first, s.GetString());
-    }
 
     delete db;
 

@@ -15,8 +15,8 @@
 (def so-download-peers (reagent/atom 0))
 (def so-dl-speed (reagent/atom 0))
 (def so-ul-speed (reagent/atom 0))
-(def so-grep-progress (reagent/atom {}))
-(def so-index-progress (reagent/atom {}))
+(def so-grep-progress (reagent/atom nil))
+(def so-index-progress (reagent/atom nil))
 (def so-archives-total (reagent/atom 0))
 (def so-archives-available
   (let [fs (.require js/window "fs")
@@ -123,45 +123,106 @@
     ret))
 
 (defn start-so-indexing [tag]
-  (reset! so-index-progress (assoc @so-index-progress tag 0))
+  (reset! so-index-progress 0)
   (let [levelup (.require js/window "levelup")
         path (.require js/window "path")
         db (levelup.
-             (.join path (zest.docs.registry/get-so-root) tag "leveldb"))
-        rStream (.createReadStream db)
-        done (atom 0)
+             (.join path (zest.docs.registry/get-so-root) "leveldb"))
+        rStream (.createReadStream
+                  db
+                  (js-obj "gt" "p_"
+                          "lt" "p_a"))
 
         LuceneIndex
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
         idx (LuceneIndex. (.join path (zest.docs.registry/get-so-root)
-                                 tag "lucene"))
+                                 "lucene"))
+
+        done (atom 0)
+        started (atom 0)
+        ended (atom false)
+        check-all-done
+        (fn []
+          (if (and @ended (= @started @done))
+            (.endWriting idx)))
+
+        auf
+        (fn [answer]
+          (let [ret-data (atom (.-Body answer))
+                ret (async/chan)
+                cStream (.createReadStream
+                          db
+                          (js-obj "gt" (str "c_" (.-Id answer) "_")
+                                  "lt" (str "c_" (.-Id answer) "_a")))]
+            (.on cStream "data"
+                 (fn [v]
+                   (let [comment (.parse js/JSON (.-value v))]
+                     (reset! ret-data (str ret-data " " (.-Text comment))))))
+
+            (.on cStream "end"
+                 (fn []
+                   (go (async/>! ret @ret-data))))
+            ret))
 
         quf
         (fn [data]
-          (let [ret (atom (str (.-Title data) " "
-                               (zest.core/unfluff (.-Body data))))]
-            (for [comment (.-comments data)]
-              (reset! ret (str ret " " (.-Text comment))))
-            (for [answer (.-answers data)]
-              (do (reset! ret (str ret " " (zest.core/unfluff
-                                             (.-Body answer))))
-                  (for [comment (.-comments answer)]
-                    (reset! ret (str ret " " (.-Text comment))))))
-            @ret))]
+          (let [ret-data (atom (str (.-Title data) " "
+                                    (zest.core/unfluff (.-Body data))))
+                ret (async/chan)
+                started (atom 0)
+                finished (atom 0)
+                ended (atom false)
+                cStream (.createReadStream
+                          db
+                          (js-obj "gt" (str "c_" (.-Id data) "_")
+                                  "lt" (str "c_" (.-Id data) "_a")))
+                check-finished
+                (fn []
+                  (if (and (= @started @finished) @ended)
+                    (go (async/>! ret @ret-data))))]
+
+            (.on cStream "data"
+                 (fn [v]
+                   (let [comment (.parse js/JSON (.-value v))]
+                     (reset! ret-data (str ret-data " " (.-Text comment))))))
+
+            (.on cStream "end"
+                 (fn []
+                   (let [aStream (.createReadStream
+                                   db
+                                   (js-obj "gt" (str "a_" (.-Id data) "_")
+                                           "lt" (str "a_" (.-Id data) "_a")))]
+                     (.on aStream "data"
+                          (fn [v]
+                            (reset! started (+ @started 1))
+                            (let [answer (.parse js/JSON (.-value v))]
+                              (go
+                                (reset! ret-data (str @ret-data
+                                                      (async/<! (auf answer))))
+                                (reset! finished (+ @finished 1))
+                                (check-finished)))))
+                     (.on aStream "end"
+                          (fn []
+                            (reset! ended true)
+                            (check-finished))))))
+            ret))]
     (.startWriting idx)
     (.on rStream "data"
          (fn [v]
            (let [data (.parse js/JSON (.-value v))]
-             (.addFile
-               idx
-               (str (.-Id data) ";" (.-Title data))
-               (quf data))
-             (reset! done (+ @done 1))
-             (if (= 0 (mod done 100))
-               (reset! so-index-progress
-                       (assoc @so-index-progress tag @done))))))
+             (reset! started (+ @started 1))
+             (go (.addFile
+                   idx
+                   (str (.-Id data) ";" (.-Title data))
+                   (async/<! (quf data)))
+                 (reset! done (+ @done 1))
+                 (if (= 0 (mod @done 100))
+                   (reset! so-index-progress @done))
+                 (check-all-done)))))
     (.on rStream "end"
-         #(.endWriting idx))))
+         (fn []
+           (reset! ended true)
+           (check-all-done)))))
 
 (defn start-so-grepping [tag]
   (let [mkdirp (.require js/window "mkdirp")
@@ -176,16 +237,14 @@
                              (array tag)
                              (js-obj "cwd"
                                      (.join path
-                                            (zest.docs.registry/get-so-root)
-                                            tag)))
+                                            (zest.docs.registry/get-so-root))))
               p7zip-posts (open-so-archive "Posts" "x")]
           (reset! so-indexing true)
           (.pipe (.-stdout p7zip-posts)
                  (.-stdin sogrep)
                  (js-obj "end" false))
           (reset! so-archives-total (+ posts-size comments-size))
-          (reset! so-grep-progress
-                  (assoc @so-grep-progress tag 0))
+          (reset! so-grep-progress 0)
           (.on (.-stderr p7zip-posts) "data"
                (fn [data]
                  (.log js/console (.toString data "utf8"))))
@@ -203,15 +262,14 @@
                         (fn [code]
                           (.log js/console
                                 "7z x comments exited with code" code)))
-                   (.write (.-stdin sogrep) (Buffer. (array 0)))  ; null separator
+                   (.write (.-stdin sogrep) (Buffer. (array 0))) ; null separator
                    )))
           (.forEach (.-lines (Lazy. (.-stdout sogrep)))
                     (fn [line]
                       (reset! so-grep-progress
-                              (assoc @so-grep-progress
-                                tag (.parseFloat
-                                      js/window
-                                      (.toString line "utf8"))))))))))
+                              (.parseFloat
+                                js/window
+                                (.toString line "utf8")))))))))
 
 (defn so-widget []
   (if @so-archives-available
@@ -219,7 +277,7 @@
      [:p "Suggested tags:"]
      [:ul
       (doall (for [tag suggested-tags]
-               (if (nil? (get @so-grep-progress tag))
+               (if (nil? @so-grep-progress)
                  (if (not @so-indexing)
                    (do ^{:key (str "so_tags_" tag)}
                        [:li (str tag " | ")
@@ -235,10 +293,12 @@
                           "Indexing " tag ": "
                           (.toFixed
                             (min 99.99                      ; never show 100%
-                                 (* 100 (/ (get @so-grep-progress tag)
+                                 (* 100 (/ @so-grep-progress
                                            @so-archives-total)))
                             2)
-                          "%")]))))]]
+                          "% filtering, "
+                          (or @so-index-progress 0)
+                          " indexing")]))))]]
     [:div
      [:p "~8GB BitTorrent download required. (provided by archive.org)"]
      (if @so-downloading
