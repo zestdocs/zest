@@ -68,9 +68,12 @@
   (if (= (count q) 0)
     (reset! results [])
     (do
-      (reset! search-results (.search search-index @query))
-      (if (= (count @search-results) 0)
-        (reset! search-results (.search search-index (str @query "*"))))
+      (let [prep-query (.replace @query #"\s+$" "")]
+        (reset! search-results (.search search-index prep-query))
+        (if (and (= (count @search-results) 0)
+                 ; poor performance with short strings followed by '*'
+                 (>= (count prep-query) 3))
+          (reset! search-results (.search search-index (str prep-query "*")))))
       (reset!
         results
         (concat
