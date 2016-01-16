@@ -129,7 +129,7 @@
   (reset! so-index-progress 0)
   (let [levelup (.require js/window "levelup")
         path (.require js/window "path")
-        fs (.require js/window "fs")
+        fs (.require js/window "fs-extra")
         rimraf (.require js/window "rimraf")
         db (levelup.
              (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb"))
@@ -153,12 +153,16 @@
               (.endWriting idx)
               (.sync rimraf (.join path (zest.docs.registry/get-so-root) "lucene"))
               (.sync rimraf (.join path (zest.docs.registry/get-so-root) "leveldb"))
-              (.renameSync
+              (.move
+                fs
                 (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
-                (.join path (zest.docs.registry/get-so-root) "lucene"))
-              (.renameSync
+                (.join path (zest.docs.registry/get-so-root) "lucene")
+                (fn []))
+              (.move
+                fs
                 (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
-                (.join path (zest.docs.registry/get-so-root) "leveldb")))))
+                (.join path (zest.docs.registry/get-so-root) "leveldb")
+                (fn [])))))
 
         auf
         (fn [answer]
