@@ -18,7 +18,7 @@
 (def so-grep-progress (reagent/atom nil))
 (def so-index-progress (reagent/atom nil))
 (def so-index-tags (reagent/atom #{}))
-(def so-archives-total (reagent/atom 0))
+(def so-archives-total (reagent/atom nil))
 (def so-archives-available
   (let [fs (.require js/window "fs")
         path (.require js/window "path")

@@ -120,6 +120,12 @@ BinInputStream *ZeroPaddedStdInInputSource::makeStream() const {
     return retStream;
 }
 
+inline const string ch2str(const XMLCh* c) {
+    char* tmp = XMLString::transcode(c);
+    string ret = string(tmp);
+    XMLString::release(&tmp);
+    return ret;
+}
 
 class MySAXHandler : public HandlerBase {
 
@@ -140,8 +146,12 @@ public:
         w.StartObject();
         for (int i = 0; i < attrs.getLength(); ++i) {
             const XMLCh* name = attrs.getName(i);
-            w.String(XMLString::transcode(name));
-            w.String(XMLString::transcode(attrs.getValue(name)));
+            char *tmpName = XMLString::transcode(name),
+                 *tmpValue = XMLString::transcode(attrs.getValue(name));
+            w.String(tmpName);
+            w.String(tmpValue);
+            XMLString::release(&tmpName);
+            XMLString::release(&tmpValue);
         }
         w.EndObject();
 
@@ -151,7 +161,7 @@ public:
     void startElement(const XMLCh* const, AttributeList& attrs) {
         if (attrs.getValue("Id") != nullptr) {
             if (comments) {
-                const string PostId = XMLString::transcode(attrs.getValue("PostId"));
+                const string PostId = ch2str(attrs.getValue("PostId"));
                 map<string, int>::iterator match = commentCounts.find(PostId);
                 if (match != commentCounts.end()) {
                     db->Put(
@@ -169,8 +179,8 @@ public:
                     if (parentId == nullptr) {
                         return;
                     }
-                    const string id = XMLString::transcode(attrs.getValue("Id"));
-                    const string transcodedParentId = XMLString::transcode(parentId);
+                    const string id = ch2str(attrs.getValue("Id"));
+                    const string transcodedParentId = ch2str(parentId);
                     auto match = answerCounts.find(transcodedParentId);
                     if (match != answerCounts.end()) {
                         db->Put(
@@ -184,7 +194,7 @@ public:
                 } else {
                     bool matches = false;
 
-                    const string tagsStr = XMLString::transcode(tags);
+                    const string tagsStr = ch2str(tags);
 
                     for (int i = 0; i < tagNames.size(); ++i) {
                         matches = tagsStr.find("<"+tagNames[i]+">") != string::npos;
@@ -192,8 +202,8 @@ public:
                     }
 
                     if (matches) {
-                        const string id = XMLString::transcode(attrs.getValue("Id"));
-                        const string postType = XMLString::transcode(attrs.getValue("PostTypeId"));
+                        const string id = ch2str(attrs.getValue("Id"));
+                        const string postType = ch2str(attrs.getValue("PostTypeId"));
 
                         if (postType == "1") {
                             db->Put(
@@ -208,7 +218,7 @@ public:
                             if (parentId == nullptr) {
                                 return;
                             }
-                            const string transcodedParentId = XMLString::transcode(parentId);
+                            const string transcodedParentId = ch2str(parentId);
                             auto match = answerCounts.find(transcodedParentId);
                             if (match != answerCounts.end()) {
                                 db->Put(
