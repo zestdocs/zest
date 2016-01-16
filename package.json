@@ -5,12 +5,14 @@
   "dependencies": {
     "escape-html": "^1.0.3",
     "fs-extra": "0.26.4",
+    "lazy": "^1.0.11",
     "level": "^1.4.0",
     "mkdirp": "^0.5.1",
     "parse5": "^2.1.0",
     "request": "^2.67.0",
     "rimraf": "^2.5.0",
-    "split.js": "^1.0.6"
+    "split.js": "^1.0.6",
+    "webtorrent": "^0.72.1"
   },
   "devDependencies": {
     "electron-packager": "5.2.0",

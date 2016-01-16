@@ -3,8 +3,15 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async]))
 
+(defn get-so-root []
+  (let [electron (.require js/window "electron")
+        path (.require js/window "path")]
+    (.join path
+           (.getDataPath (.-app (.-remote electron)))
+           "so")))
+
 (defn get-devdocs-root []
-  (let [electron (.require js.window "electron")
+  (let [electron (.require js/window "electron")
         path (.require js/window "path")]
     (.join path
            (.getDataPath (.-app (.-remote electron)))

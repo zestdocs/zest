@@ -18,6 +18,7 @@ using namespace rapidjson;
 using namespace std;
 using namespace xercesc;
 
+string tagName;
 
 class ZeroSeparatedBinFileInputStream : public BinFileInputStream {
 
@@ -88,8 +89,7 @@ XMLSize_t ZeroSeparatedBinFileInputStream::readBytes(XMLByte *const toFill, cons
     if (done - prevStatus >= 10000*1000) {
         time_t dt = time(nullptr) - t0;
         const long long all = 9601970627 + 30613095889;
-        if (dt > 0)
-            std::cout << done << " " << (all/done) << " " << (all*dt/done - dt) << endl;
+        std::cout << done << std::endl;
         prevStatus = done;
     }
     return ret;
@@ -201,7 +201,7 @@ public:
                     ispy = items.find(XMLString::transcode(parentId)) != items.end();
                 } else {
                     const string tagsStr = XMLString::transcode(tags);
-                    ispy = tagsStr.find("<python>") != string::npos;
+                    ispy = tagsStr.find("<"+tagName+">") != string::npos;
                 }
 
                 if (ispy) {
@@ -221,8 +221,8 @@ public:
 };
 
 
-
-int main() {
+int main(int argc, const char ** argv) {
+    tagName = argv[1];
     try {
         XMLPlatformUtils::Initialize();
     } catch (const XMLException& e) {
@@ -242,7 +242,7 @@ int main() {
     leveldb::DB* db;
     leveldb::Options options;
     options.create_if_missing = true;
-    leveldb::DB::Open(options, "python", &db);
+    leveldb::DB::Open(options, "leveldb", &db);
 
     for (auto it = handler->items.begin(); it != handler->items.end(); ++it) {
         Item *i = it->second;
