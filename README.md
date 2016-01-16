@@ -172,34 +172,6 @@ furnished to do so, subject to the following conditions:
 
 # Basic Proof of Concept usage
 
-DevDocs downloader is now implemented in the "Settings" modal.
+DevDocs downloader, Stack Overflow torrent downloader, and Stack Overflow indexer are now implemented in the "Settings" modal.
 
-## Generating Stack Overflow index
-
-The following steps allow generating a searchable Stack Overflow Python questions
-index.
-
-### Stack Overflow index
- - (1) Download `stackoverflow.com-Posts.7z` and `stackoverflow.com-Comments.7z` from
-    the torrent at https://archive.org/details/stackexchange
- - (2) Build `sogrep` with `cd sogrep`, `cmake .`, `make`
- - (3) In the directory with `7z` files from 1, run
-```
-(7z x -so  stackoverflow.com-Posts.7z  Posts.xml ; \
- echo -en '\x00'; \
- 7z x -so  stackoverflow.com-Comments.7z  Comments.xml ) \
-     | path/to/sogrep
-```
-It will generate a `python` directory containing a leveldb database with SO posts.
- - (4) In `zest/core.cljs` and `app/index.js` change the
-    `/Users/jkozera/Downloads/stackexchange/python` path
-    to the one from above.
- - (5) Run `app/index.js` (note it may require building a different version of `nodelucene`
-    than for Electron - see (5.1) below)
-    It will generate a `SOPython` directory with full text search index. Move it to
-    `app/SOPython` unless it's already there.
- - (5.1) If (5) failed, it means your nodejs version is different from Electron's.
-    You can rebuild nodelucene for your nodejs by running `node-gyp rebuild`:
-
-This should cover all use cases available in the proof of concept. Obviously all
-these steps need to be automated, and hardcoded paths made configurable.
+`sogrep` and `7z` binaries need to be in PATH. (`sogrep` can be built from the `sogrep/` directory - `cmake . && make` should do it, given installed xerces, leveldb and rapidjson)
