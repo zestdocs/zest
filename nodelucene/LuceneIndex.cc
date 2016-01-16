@@ -1,3 +1,6 @@
+#include <iostream>
+
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/filesystem.hpp>
 
 #include "LuceneIndex.h"
@@ -173,17 +176,24 @@ namespace nodelucene {
         Lucene::String queryLStr(StringUtils::toUnicode(*String::Utf8Value(queryStr)));
 
         TopScoreDocCollectorPtr collector = TopScoreDocCollector::create(10, false);
-        QueryPtr query = obj->parser->parse(queryLStr);
-        obj->searcher->search(query, collector);
-
-        Collection<ScoreDocPtr> hits = collector->topDocs()->scoreDocs;
 
         Local<v8::Array> ret = v8::Array::New(isolate);
         args.GetReturnValue().Set(ret);
 
-        for (int32_t i = 0; i < hits.size(); ++i) {
-            DocumentPtr doc = obj->searcher->doc(hits[i]->doc);
-            ret->Set(i, String::NewFromUtf8(isolate, (StringUtils::toUTF8(doc->get(L"path"))).c_str()));
+        try {
+            QueryPtr query = obj->parser->parse(queryLStr);
+            obj->searcher->search(query, collector);
+
+            Collection<ScoreDocPtr> hits = collector->topDocs()->scoreDocs;
+
+            for (int32_t i = 0; i < hits.size(); ++i) {
+                DocumentPtr doc = obj->searcher->doc(hits[i]->doc);
+                ret->Set(i, String::NewFromUtf8(isolate, (StringUtils::toUTF8(doc->get(L"path"))).c_str()));
+            }
+        } catch (std::exception const& e) {
+            std::cerr << e.what() << std::endl;
+        } catch (boost::exception const& e) {
+            std::cerr << boost::diagnostic_information(e) << std::endl;
         }
     }
 
