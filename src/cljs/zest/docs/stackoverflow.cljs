@@ -21,7 +21,7 @@
     [process-tags
      (fn [tags]
        (if tags (.map
-                  (.match tags #"<[^>]+>")
+                  (.match tags (js/RegExp. "<[^>]+>" "g"))
                   #(.substring % 1 (- (.-length %) 1)))))
 
      process-answer
