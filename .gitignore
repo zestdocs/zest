@@ -28,6 +28,8 @@ SearchIndex
 app/build
 sogrep/sogrep
 sogrep/Makefile
+nodelucene/searcher
+nocelucene/Makefile
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(nodelucene)
+project(searcher)
 
 find_package(PkgConfig)
 find_package(
@@ -16,15 +16,15 @@ pkg_search_module(LUCENE_CONTRIB REQUIRED liblucene++-contrib)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(SOURCE_FILES LuceneIndex.cc LuceneIndex.h)
+set(SOURCE_FILES searcher.cc)
 
 link_directories(
         ${LUCENE_LIBRARY_DIRS}
         ${LUCENE_CONTRIB_LIBRARY_DIRS}
 )
-add_executable(nodelucene ${SOURCE_FILES})
+add_executable(searcher ${SOURCE_FILES})
 target_link_libraries(
-        nodelucene
+        searcher
         ${LUCENE_LIBRARIES}
         ${LUCENE_CONTRIB_LIBRARIES}
         ${Boost_LIBRARIES}
@@ -35,7 +35,7 @@ target_link_libraries(
         ${Boost_THREAD_LIBRARIES}
 )
 target_include_directories(
-        nodelucene
+        searcher
         PUBLIC
         "/usr/local/include/node"
         ${LUCENE_INCLUDE_DIRS}
@@ -43,7 +43,7 @@ target_include_directories(
         ${Boost_INCLUDE_DIRS}
 )
 target_compile_options(
-        nodelucene
+        searcher
         PUBLIC
         ${LUCENE_CFLAGS_OTHER}
         ${LUCENE_CONTRIB_CFLAGS_OTHER}

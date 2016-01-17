@@ -174,4 +174,4 @@ furnished to do so, subject to the following conditions:
 
 DevDocs downloader, Stack Overflow torrent downloader, and Stack Overflow indexer are now implemented in the "Settings" modal.
 
-`sogrep` and `7z` binaries need to be in PATH. (`sogrep` can be built from the `sogrep/` directory - `cmake . && make` should do it, given installed xerces, leveldb and rapidjson)
+`7z`, `sogrep`, and `searcher` binaries need to be in PATH. (`sogrep` and `searcher` can be built from the `sogrep/` and `nodelucene/` directories respectively - `cmake . && make` should do it, given installed xerces, leveldb and rapidjson)

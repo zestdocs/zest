@@ -6,19 +6,25 @@
             [goog.net.XhrIo]
             [zest.settings]
             [zest.docs.registry]
-            [zest.docs.stackoverflow]))
-
-(def search-index
-  (let [path (.require js/window "path")
-        LuceneIndex
-        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
-    (LuceneIndex. (.join path (zest.docs.registry/get-so-root) "lucene"))))
+            [zest.docs.stackoverflow]
+            [zest.searcher]))
 
 (def so-db
   (let [levelup (.require js/window "levelup")
         path (.require js/window "path")]
     (levelup (.join path (zest.docs.registry/get-so-root)
                     "leveldb"))))
+
+(def so-index
+  (let
+    [path (.require js/window "path")]
+    (.join path (zest.docs.registry/get-so-root) "lucene")))
+
+(def so-hl-index
+  (let [path (.require js/window "path")
+        LuceneIndex
+        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
+    (LuceneIndex. (.join path (zest.docs.registry/get-so-root) "lucene"))))
 
 (def query (reagent/atom ""))
 (def results (reagent/atom []))
@@ -64,11 +70,16 @@
     (reset! results [])
     (do
       (let [prep-query (.replace @query #"\s+$" "")]
-        (reset! search-results (.search search-index prep-query))
-        (if (and (= (count @search-results) 0)
-                 ; poor performance with short strings followed by '*'
-                 (>= (count prep-query) 3))
-          (reset! search-results (.search search-index (str prep-query "*")))))
+        (go (reset! search-results
+                    (async/<! (zest.searcher/search so-index prep-query)))
+            (if (and (= (count @search-results) 0)
+                     ; poor performance with short strings followed by '*'
+                     ;        (>= (count prep-query) 3))
+                     (reset!
+                       search-results
+                       (async/<! (zest.searcher/search
+                                   so-index
+                                   (str prep-query "*"))))))))
       (reset!
         results
         (concat
@@ -137,7 +148,7 @@
                     @res
                     "<h2>" (nth (.split (nth files @i) ";") 1) "</h2>"
                     (.highlight
-                      search-index
+                      so-hl-index
                       (escape-html (zest.docs.stackoverflow/unfluff
                                      (.-Body (.parse js/JSON ret))))
                       @query)))
@@ -236,19 +247,19 @@
           [entry (get-in @docset-type-items [docset type])]
           ^{:key (str docset "_" (.-name type) "_" (.-path entry) "_" (.-name entry))}
 
-           [:a
-            {:class "collection-item"
-             :href "#"
-             :on-click #(activate-item docset entry)}
-            (.-name entry)])])
+          [:a
+           {:class    "collection-item"
+            :href     "#"
+            :on-click #(activate-item docset entry)}
+           (.-name entry)])])
 
      refresh
      (fn []
        (let [entry (nth @results @index)
              entry-path (.-path (.-contents entry))]
-         (if (= "__FTS__" entry-path)
-           (fts-results (.search search-index @query) #(async-set-html % (fn [])))
-           (activate-item (.-docset entry) (.-contents entry)))))
+         ;(if (= "__FTS__" entry-path)
+         ;  (fts-results (.search search-index @query) #(async-set-html % (fn [])))
+           (activate-item (.-docset entry) (.-contents entry))))
 
      fts-suggestions
      (fn []
@@ -259,12 +270,12 @@
               (map
                 (fn [res] ^{:key res}
 
-                 [:a
-                  {:href "#"
-                   :class "collection-item"
-                   :on-click #(activate-item "stackoverflow"
-                                             (nth (.split res ";") 0))}
-                  (nth (.split res ";") 1)])
+                [:a
+                 {:href     "#"
+                  :class    "collection-item"
+                  :on-click #(activate-item "stackoverflow"
+                                            (nth (.split res ";") 0))}
+                 (nth (.split res ";") 1)])
                 @search-results)])
          [:div]))]
 
@@ -339,13 +350,13 @@
                                                               (dissoc (get @docset-type-items (:name docset)) type))))}
 
                                      (.-name type)]
-                                   [section (:name docset) type]])))]))
+                                    [section (:name docset) type]])))]))
               [:div {:class "collection"} (doall (for [[i item] (map-indexed vector @results)]
                                                    ^{:key (str @query (str i))}
                                                    [:a
                                                     {:class    (if (= @index i) "collection-item active"
                                                                                 "collection-item")
-                                                     :href "#"
+                                                     :href     "#"
                                                      :on-click (fn []
                                                                  (reset! index i)
                                                                  (refresh)
@@ -381,6 +392,7 @@
 (defn before-figwheel-reload []
   (.log js/console "before")
   (.close so-db)
+  (zest.searcher/stop-all-searchers)
   (.removeEventListener
     (.-body js/document)
     "figwheel.before-js-reload"
@@ -393,11 +405,11 @@
     "figwheel.before-js-reload"
     before-figwheel-reload))
 
-(defn on-figwheel-reload []
-  (add-figwheel-handler)
-  (mount-root))
-
 (defn init!
   []
   (add-figwheel-handler)
+  (zest.searcher/new-searcher so-index)
   (mount-root))
+
+(defn on-figwheel-reload []
+  (init!))
