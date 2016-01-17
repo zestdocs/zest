@@ -2,7 +2,7 @@
 {{#each comments }}
 <li {{!-- {% if loop.index > default_comments_max %}class="hidden-comment"{% endif %} --}}>
     {{#if Score }}
-    <p class="post-comment-score">{{ c.score }}</p>
+    <p class="post-comment-score">{{ Score }}</p>
     {{/if}}
     <div class="post-comment-text">
         {{ Text }} &mdash;

@@ -143,6 +143,21 @@
         idx (LuceneIndex. (.join path (zest.docs.registry/get-so-root)
                                  "new_index" "lucene"))
 
+        render-answer-blob
+        (fn [data]
+          (str (.-Title data) " "
+               (zest.docs.stackoverflow/unfluff (.-Body data))
+               (apply str (.map (.-comments data) #(str " " (.-Text %))))))
+
+        render-blob
+        (fn [data]
+          (str (.-Title data) " "
+               (zest.docs.stackoverflow/unfluff (.-Body data))
+               (apply str (.map (.-comments data)
+                                #(str " " (.-Text %))))
+               (apply str (.map (.-answers data)
+                                #(str " " (render-answer-blob %))))))
+
         done (atom 0)
         started (atom 0)
         ended (atom false)
@@ -162,68 +177,7 @@
                 fs
                 (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
                 (.join path (zest.docs.registry/get-so-root) "leveldb")
-                (fn [])))))
-
-        auf
-        (fn [answer]
-          (let [ret-data (atom (zest.core/unfluff (.-Body answer)))
-                ret (async/chan)
-                cStream (.createReadStream
-                          db
-                          (js-obj "gt" (str "c_" (.-Id answer) "_")
-                                  "lt" (str "c_" (.-Id answer) "_a")))]
-            (.on cStream "data"
-                 (fn [v]
-                   (let [comment (.parse js/JSON (.-value v))]
-                     (reset! ret-data (str @ret-data " " (.-Text comment))))))
-
-            (.on cStream "end"
-                 (fn []
-                   (go (async/>! ret @ret-data))))
-            ret))
-
-        quf
-        (fn [data]
-          (let [ret-data (atom (str (.-Title data) " "
-                                    (zest.core/unfluff (.-Body data))))
-                ret (async/chan)
-                started (atom 0)
-                finished (atom 0)
-                ended (atom false)
-                cStream (.createReadStream
-                          db
-                          (js-obj "gt" (str "c_" (.-Id data) "_")
-                                  "lt" (str "c_" (.-Id data) "_a")))
-                check-finished
-                (fn []
-                  (if (and (= @started @finished) @ended)
-                    (go (async/>! ret @ret-data))))]
-
-            (.on cStream "data"
-                 (fn [v]
-                   (let [comment (.parse js/JSON (.-value v))]
-                     (reset! ret-data (str @ret-data " " (.-Text comment))))))
-
-            (.on cStream "end"
-                 (fn []
-                   (let [aStream (.createReadStream
-                                   db
-                                   (js-obj "gt" (str "a_" (.-Id data) "_")
-                                           "lt" (str "a_" (.-Id data) "_a")))]
-                     (.on aStream "data"
-                          (fn [v]
-                            (reset! started (+ @started 1))
-                            (let [answer (.parse js/JSON (.-value v))]
-                              (go
-                                (let [ans-data (async/<! (auf answer))]
-                                  (reset! ret-data (str @ret-data ans-data))
-                                  (reset! finished (+ @finished 1))
-                                  (check-finished))))))
-                     (.on aStream "end"
-                          (fn []
-                            (reset! ended true)
-                            (check-finished))))))
-            ret))]
+                (fn [])))))]
     (.startWriting idx)
     (.on rStream "data"
          (fn [v]
@@ -232,7 +186,9 @@
              (go (.addFile
                    idx
                    (str (.-Id data) ";" (.-Title data))
-                   (async/<! (quf data)))
+                   (render-blob
+                     (async/<!
+                       (zest.docs.stackoverflow/process-so-post data))))
                  (reset! done (+ @done 1))
                  (if (= 0 (mod @done 100))
                    (reset! so-index-progress @done))

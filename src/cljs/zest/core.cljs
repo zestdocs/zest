@@ -5,19 +5,8 @@
             [cljsjs.react]
             [goog.net.XhrIo]
             [zest.settings]
-            [zest.docs.registry]))
-
-(defn unfluff
-  [html]
-  (let
-    [parse5 (.require js/window "parse5")
-     res (reagent/atom "")
-     SAXParser (.-SAXParser parse5)
-     parser (SAXParser. ())]
-
-    (.on parser "text" (fn [text] (reset! res (str @res text))))
-    (.write parser html)
-    @res))
+            [zest.docs.registry]
+            [zest.docs.stackoverflow]))
 
 (def search-index
   (let [path (.require js/window "path")
@@ -113,82 +102,11 @@
               (.readFileSync fs "app/templates/comments.handlebars"
                              "utf8"))
             (.log js/console data)
-            (tpl (js-obj "post" data))))
+            (tpl (js-obj "post" data))))]
+    (go (render-template (async/<!
+                           (zest.docs.stackoverflow/process-so-post data))))))
 
-        process-tags
-        (fn [tags]
-          (if tags (.map
-            (.match tags #"<[^>]+>")
-            #(.substring % 1 (- (.-length %) 1)))))
 
-        process-answer
-        (fn [answer]
-          (let [ret-data answer
-                ret (async/chan)
-                cStream (.createReadStream
-                          so-db
-                          (js-obj "gt" (str "c_" (.-Id answer) "_")
-                                  "lt" (str "c_" (.-Id answer) "_a")))]
-            (aset ret-data "comments" (array))
-            (aset ret-data "Tags" (process-tags (aget ret-data "Tags")))
-            (if (and (aget data "AcceptedAnswerId")
-                     (= (aget ret-data "Id") (aget data "AcceptedAnswerId")))
-              (aset ret-data "Accepted" true))
-
-            (.on cStream "data"
-                 (fn [v]
-                   (let [comment (.parse js/JSON (.-value v))]
-                     (.push (aget ret-data "comments") comment))))
-
-            (.on cStream "end"
-                 (fn []
-                   (go (async/>! ret ret-data))))
-            ret))
-
-        ret-data data
-        ret (async/chan)
-        started (atom 0)
-        finished (atom 0)
-        ended (atom false)
-        cStream (.createReadStream
-                  so-db
-                  (js-obj "gt" (str "c_" (.-Id data) "_")
-                          "lt" (str "c_" (.-Id data) "_a")))
-        check-finished
-        (fn []
-          (if (and (= @started @finished) @ended)
-                        (go (async/>! ret (render-template ret-data)))))]
-
-    (aset ret-data "answers" (array))
-    (aset ret-data "comments" (array))
-    (aset ret-data "Tags" (process-tags (aget ret-data "Tags")))
-
-    (.on cStream "data"
-         (fn [v]
-           (let [comment (.parse js/JSON (.-value v))]
-                   (.push (aget ret-data "comments") comment))))
-
-    (.on cStream "end"
-         (fn []
-           (let [aStream (.createReadStream
-                           so-db
-                           (js-obj "gt" (str "a_" (.-Id data) "_")
-                                   "lt" (str "a_" (.-Id data) "_a")))]
-             (.on aStream "data"
-                  (fn [v]
-                    (reset! started (+ @started 1))
-                    (let [answer (.parse js/JSON (.-value v))]
-                      (go
-                        (let [ans-data (async/<!
-                                         (process-answer answer))]
-                          (.push (aget ret-data "answers") ans-data)
-                          (reset! finished (+ @finished 1))
-                          (check-finished))))))
-             (.on aStream "end"
-                  (fn []
-                    (reset! ended true)
-                    (check-finished))))))
-    ret))
 
 (defn main-page
   []
@@ -222,7 +140,8 @@
                     "<h2>" (nth (.split (nth files @i) ";") 1) "</h2>"
                     (.highlight
                       search-index
-                      (escape-html (unfluff (.-Body (.parse js/JSON ret))))
+                      (escape-html (zest.docs.stackoverflow/unfluff
+                                     (.-Body (.parse js/JSON ret))))
                       @query)))
                 (if (< @i (- (count files) 1))
                   (do (reset! i (+ @i 1)) (next))
@@ -296,7 +215,7 @@
              (str "p_" entry)
              (fn [e json]
                (let [data (.parse js/JSON json)]
-                 (go (async-set-html (async/<! (render-so-post data))#()))))))
+                 (go (async-set-html (async/<! (render-so-post data)) #()))))))
          (let [response (aget (aget docset-db-cache docset)
                               (nth (.split (.-path entry) "#") 0))]
            (let [new-hash (nth (.split (.-path entry) "#") 1)]
