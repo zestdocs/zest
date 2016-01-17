@@ -92,25 +92,60 @@
       (reset! index 0))))
 
 (defn render-so-post [data]
-  (let [process-answer
+  (let [render-template
+        (fn [data]
+          (let [handlebars (.require js/window "handlebars")
+                fs (.require js/window "fs")
+                tpl (.compile
+                      handlebars
+                      (.readFileSync fs "app/templates/post.handlebars"
+                                     "utf8"))]
+            (.registerHelper
+              handlebars
+              "ifPlural"
+              (fn [var options]
+                (.log js/console var)
+                (if (not (= 1 (int var)))
+                  (this-as js-this (.fn options js-this)))))
+            (.registerPartial
+              handlebars
+              "renderComments"
+              (.readFileSync fs "app/templates/comments.handlebars"
+                             "utf8"))
+            (.log js/console data)
+            (tpl (js-obj "post" data))))
+
+        process-tags
+        (fn [tags]
+          (if tags (.map
+            (.match tags #"<[^>]+>")
+            #(.substring % 1 (- (.-length %) 1)))))
+
+        process-answer
         (fn [answer]
-          (let [ret-data (atom (.-Body answer))
+          (let [ret-data answer
                 ret (async/chan)
                 cStream (.createReadStream
                           so-db
                           (js-obj "gt" (str "c_" (.-Id answer) "_")
                                   "lt" (str "c_" (.-Id answer) "_a")))]
+            (aset ret-data "comments" (array))
+            (aset ret-data "Tags" (process-tags (aget ret-data "Tags")))
+            (if (and (aget data "AcceptedAnswerId")
+                     (= (aget ret-data "Id") (aget data "AcceptedAnswerId")))
+              (aset ret-data "Accepted" true))
+
             (.on cStream "data"
                  (fn [v]
                    (let [comment (.parse js/JSON (.-value v))]
-                     (reset! ret-data (str @ret-data " " (.-Text comment))))))
+                     (.push (aget ret-data "comments") comment))))
 
             (.on cStream "end"
                  (fn []
-                   (go (async/>! ret @ret-data))))
+                   (go (async/>! ret ret-data))))
             ret))
 
-        ret-data (atom (str (.-Title data) " " (.-Body data)))
+        ret-data data
         ret (async/chan)
         started (atom 0)
         finished (atom 0)
@@ -122,12 +157,16 @@
         check-finished
         (fn []
           (if (and (= @started @finished) @ended)
-                        (go (async/>! ret @ret-data))))]
+                        (go (async/>! ret (render-template ret-data)))))]
+
+    (aset ret-data "answers" (array))
+    (aset ret-data "comments" (array))
+    (aset ret-data "Tags" (process-tags (aget ret-data "Tags")))
 
     (.on cStream "data"
          (fn [v]
            (let [comment (.parse js/JSON (.-value v))]
-             (reset! ret-data (str @ret-data " " (.-Text comment))))))
+                   (.push (aget ret-data "comments") comment))))
 
     (.on cStream "end"
          (fn []
@@ -142,9 +181,9 @@
                       (go
                         (let [ans-data (async/<!
                                          (process-answer answer))]
-                          (reset! ret-data (str @ret-data ans-data)))
+                          (.push (aget ret-data "answers") ans-data)
                           (reset! finished (+ @finished 1))
-                          (check-finished)))))
+                          (check-finished))))))
              (.on aStream "end"
                   (fn []
                     (reset! ended true)

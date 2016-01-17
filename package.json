@@ -5,6 +5,7 @@
   "dependencies": {
     "escape-html": "^1.0.3",
     "fs-extra": "0.26.4",
+    "handlebars": "^4.0.5",
     "lazy": "^1.0.11",
     "level": "^1.4.0",
     "mkdirp": "^0.5.1",

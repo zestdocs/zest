@@ -1,0 +1,116 @@
+<div class="row question">
+    <div class="span16">
+        <h1>
+            {{ post.Title }}
+        </h1>
+        <div class="post-stats-vertical">
+            <div class="post-stat">
+                <p class="post-stat-value {% if post.score < 0 %}post-stat-value-poor{% endif %}">
+                    {{ post.Score }}
+                </p>
+                <p>vote{{#ifPlural post.Score }}s{{/ifPlural}}</p>
+            </div>
+            <div class="post-stat">
+                <p class="post-stat-value {% if post.answers.length == 0 %}post-stat-value-poor{% endif %}">
+                    {{ post.answers.length }}
+                </p>
+                <p>answer{{#ifPlural post.answers.length }}s{{/ifPlural}}</p>
+            </div>
+        </div>
+        <div class="post-body">
+            {{{ post.Body }}}
+        </div>
+        <div class="post-metadata">
+            <div class="post-user">
+                <p>asked on <strong>{{ post.CreationDate }}</strong></p>
+                {{!-- {{ macros.user_card(post.ownerUser) }} --}}
+            </div>
+
+            {{#if post.lastEditorUser}}
+            <div class="post-user">
+                <p>last edited <strong>{{ post.LastActivityDate }}</strong></p>
+                {{!--  {{ macros.user_card(post.lastEditorUser) }} --}}
+            </div>
+            {{/if}}
+            <div class="post-tags">
+                    {{#each post.Tags}}
+                    <span class="label">{{this}}</span>
+                    {{/each}}
+            </div>
+        </div>
+        {{#if post.comments}}
+        <div class="post-comments">
+            {{> renderComments }}
+        </div>
+        {{/if}}
+    </div>
+</div>
+
+{{#if post.ClosedDate}}
+<div class="row moderated">
+    <div class="span16">
+        <p>This question was <em>closed</em> by a moderator on <strong>{{ post.ClosedDate }}</strong>.</p>
+    </div>
+</div>
+{{/if}}
+
+<div class="row answers">
+    <div class="span16">
+        {{#if post.answers}}
+        <h1 class="answers">{{ post.answers.length }} answer{{#ifPlural post.answers.length}}s{{/ifPlural}}</h1>
+        <ul class="answers">
+            {{#each post.answers }}
+            <li id="answer-{{ Id }}">
+                <a name="answer-{{ Id }}"></a>
+                <div class="post-stats-vertical">
+                    <div class="post-stat">
+                        <p class="post-stat-value {% if a.score < 0 %}post-stat-value-poor{% endif %}">
+                            {{ Score }}
+                        </p>
+                        <p>vote{{#ifPlural Score}}s{{/ifPlural}}</p>
+                    </div>
+                    {{#if Accepted }}
+                    <div class="post-stat post-stat-img">
+                        <img src="{{ SETTINGS.APP_URL_ROOT }}media/images/accepted_answer.png" alt="Accepted answer" />
+                    </div>
+                    {{/if}}
+                </div>
+                <div class="post-body">
+                    {{{ Body }}}
+                </div>
+                <div class="post-metadata">
+                    <div class="post-user">
+                        <p>answered on <strong>{{ CreationDate }}</strong></p>
+{{!--                         {{ macros.user_card(a.ownerUser) }} --}}
+                    </div>
+
+                    {{#if LastEditorUser}}
+                    <div class="post-user">
+                        <p>last edited <strong>{{ LastEditDate }}</strong></p>
+{{!--                         {{ macros.user_card(a.lastEditorUser) }} --}}
+                    </div>
+                    {{/if}}
+                    <div class="post-actions">
+                        <a href="http://stackoverflow.com/a/{{ a.id }}">permalink</a>
+                    </div>
+                    <div class="post-tags">
+                        {{#each Tags}}
+                        <span class="label">{{ text }}</span>
+                        {{/each}}
+                    </div>
+                </div>
+
+                <div class="post-comments">
+                    {{#if a.comments }}
+                        {{> renderComments }}
+                    {{/if}}
+                </div>
+            </li>
+            {{/each}}
+        </ul>
+        {{/if}}
+        {{#unless post.answers}}
+        <p class="no-answers">There are no answers for this question :(</p>
+        {{/unless}}
+    </div>
+</div>

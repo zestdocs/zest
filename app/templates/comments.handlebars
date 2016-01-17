@@ -1,0 +1,17 @@
+<ul>
+{{#each comments }}
+<li {{!-- {% if loop.index > default_comments_max %}class="hidden-comment"{% endif %} --}}>
+    {{#if Score }}
+    <p class="post-comment-score">{{ c.score }}</p>
+    {{/if}}
+    <div class="post-comment-text">
+        {{ Text }} &mdash;
+        <span class="post-comment-metadata">
+            {{!--  <strong>{{ user_name(c.user) }}</strong> on --}}
+            <strong>{{ User }}</strong
+            {{!-- <strong>{{ c.creationDate|format_datetime }}</strong> --}}
+        </span>
+    </div>
+</li>
+{{/each}}
+</ul>

@@ -1,3 +1,5 @@
+
+
 /* split.js */
 .split, .gutter.gutter-horizontal, #left, #right {
   float: left;
@@ -15,6 +17,7 @@
 
 #right {
   overflow: auto;
+  padding: 0 3rem;
 }
 
 .gutter {
@@ -69,4 +72,269 @@
   box-shadow: none;
   color: inherit;
   text-decoration: none;
+}
+
+
+/* https://bitbucket.org/samuel.lai/stackdump/src/15159ac5b5469ddaebf76dc23d1c22dacfb845b5/python/media/css/main.css?at=default&fileviewer=file-view-default */
+
+.post-logo {
+    float: left;
+    width: 48px;
+}
+
+.post-stats-vertical {
+    float: left;
+    width: 64px;
+}
+
+.post-stat {
+    text-align: center;
+    background-color: #F2F2F2;
+    margin-bottom: 5px;
+    padding: 10px 5px;
+}
+
+.post-stat-img {
+    background-color: transparent;
+}
+
+.post-stat p {
+    margin-bottom: 0;
+}
+
+.post-stat-value {
+    font-weight: bold;
+    font-size: 16pt;
+    color: #000000;
+}
+
+.post-stat-value-poor {
+    color: #AAAAAA;
+}
+
+.post-stat-value-good {
+    color: #5ebb00;
+}
+
+.post-summary {
+    padding-left: 72px; /* 64px for post-stats-vertical + 8px for padding */
+}
+
+.post-summary-with-logo {
+    padding-left: 120px; /* 48px for post-logo + 64px for post-stats-vertical + 8px for padding */
+}
+
+.post-summary h3 {
+    line-height: normal;
+    padding: 7px 0;
+    margin-bottom: 0;
+}
+
+.post-details {
+    float: right;
+}
+
+.post-tags, .post-actions {
+    margin-bottom: 10px;
+}
+
+.post-actions a {
+    color: #999999;
+}
+
+.question h1 {
+    border-bottom: 1px solid #CCCCCC;
+    padding-bottom: 7px;
+    margin-top: 15px;
+}
+
+.post-body, .post-metadata, .post-comments {
+    margin-left: 72px; /* 64px for post-stats-vertical + 8px for padding */
+}
+
+/* undo the zero margin-bottom imposed by bootstrap */
+.post-body ul, .post-body ol {
+    margin-bottom: 7px;
+}
+
+.post-body .external-link, .post-comments .external-link {
+    color: #999999;
+}
+
+.post-metadata {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #CCCCCC;
+}
+
+.post-user {
+    float: right;
+    margin-left: 50px;
+    color: #404040;
+}
+
+.post-comments {
+    clear: right;
+}
+
+.post-comments ul {
+    list-style: none;
+    margin-left: 0;
+    margin-bottom: 18px;
+}
+
+.post-comments li {
+    border-bottom: 1px solid #E3E3E3;
+    padding: 7px 4px 7px 0;
+    color: #404040;
+}
+
+.post-comments li:last-child {
+    border-bottom: none;
+}
+
+li .post-comment-score {
+    float: left;
+    font-weight: bold;
+    color: #000000;
+    width: 40px;
+    text-align: center;
+    line-height: normal;
+    margin-bottom: 0;
+}
+
+li .post-comment-text {
+    margin-left: 40px;
+    line-height: 20px;
+    margin-bottom: 0;
+}
+
+/* this rule is needed as comments are wrapped in <p>...</p> but we want the
+ * user name afterwards to appear on the same line. */
+li .post-comment-text > p {
+    display: inline;
+}
+
+li .post-comment-metadata {
+    color: #999999;
+}
+
+.show-comments {
+    display: none;
+    margin-bottom: 18px;
+}
+
+.user-card {
+    background-color: #F2F2F2;
+}
+
+.user-card .user-name {
+    padding: 4px 7px;
+}
+
+.user-card .user-rep {
+    float: right;
+    font-weight: bold;
+    font-size: 15px;
+    background-color: #CCCCCC;
+    padding: 4px 7px;
+}
+
+div.moderated {
+    background-color: #F2F2F2;
+    padding: 10px;
+    text-align: center;
+    margin-left: 0;
+}
+
+div.moderated p {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+div.answers {
+    margin-top: 30px;
+}
+
+ul.answers {
+    list-style: none;
+    margin-left: 0;
+}
+
+ul.answers > li {
+    padding-bottom: 30px;
+    border-bottom: 1px solid #999999;
+    margin-top: 30px;
+    color: #404040;
+    clear: both;
+    display: block;
+}
+
+ul.answers > li:last-child {
+    border-bottom: none;
+}
+
+h1.answers {
+    margin-bottom: 7px;
+    line-height: normal;
+    border-bottom: 1px solid #999999;
+    padding-bottom: 7px;
+}
+
+.no-answers {
+    font-size: 24pt;
+    color: #CCCCCC;
+    text-align: center;
+    padding-bottom: 120px;
+    padding-top: 90px;
+}
+
+#footer, #footer-push {
+    height: 20px;
+}
+
+#footer {
+    clear: both;
+    border-top: solid 1px #999999;
+    background-color: #CCCCCC;
+    padding: 7px 10px;
+}
+
+#footer .footer-right {
+    float: right;
+}
+
+.nodata.row, .importinprogress.row, .errormessage.row {
+    margin-top: 50px;
+    margin-bottom: 20px;
+}
+
+.nodata h2, .importinprogress h2, .errormessage h2 {
+    margin-top: 25px;
+    margin-bottom: 7px;
+}
+
+.nodata li {
+    color: inherit;
+    border-bottom: 1px solid #F2F2F2;
+    padding-bottom: 7px;
+    margin-bottom: 7px;
+}
+
+.nodata li:last-of-type {
+    border-bottom: none;
+    padding-bottom: inherit;
+    margin-bottom:  inherit;
+}
+
+.nodata pre {
+    margin-top: 7px;
+}
+
+p.page-actions {
+    padding-top: 25px;
+}
+
+.importinprogress .subinfo, .errormessage .subinfo {
+    color: #999999;
 }
