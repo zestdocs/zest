@@ -397,12 +397,13 @@
             (doall (for [doc @available-devdocs]
                      (if (= -1 (.indexOf @installed-devdocs
                                          (.-slug doc)))
-                       ^{:key (str "availabledoc_" (.-slug doc))}
                        (if (contains? @downloading (.-slug doc))
+                         ^{:key (str "availabledoc_" (.-slug doc))}
                          [:li {:class "collection-item"}
                           (str "downloading " (.-slug doc) "... "
                                (get @downloading (.-slug doc))
                                "%")]
+                         ^{:key (str "availabledoc_" (.-slug doc))}
                          [:li {:class "collection-item"}
                           [:a
                            {:on-click #(download-devdocs
