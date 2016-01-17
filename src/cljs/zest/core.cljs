@@ -106,8 +106,6 @@
     (go (render-template (async/<!
                            (zest.docs.stackoverflow/process-so-post data))))))
 
-
-
 (defn main-page
   []
   (let
@@ -209,7 +207,7 @@
      (fn [docset entry]
        (if (= docset "stackoverflow")
          (let []
-           (.log js/console entry)
+           (set! (.-scrollTop (.getElementById js/document "right")) 0)
            (.get
              so-db
              (str "p_" entry)
@@ -226,6 +224,8 @@
 
                (do
                  (reset! hash new-hash)
+                 (aset (.getElementById js/document "right") "className"
+                       (str "_" docset))
                  (async-set-html response #(set-hash new-hash))
                  (set-600ms-focus)))))))
 

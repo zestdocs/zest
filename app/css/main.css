@@ -1,4 +1,14 @@
+th {
+    color: black;  /* fixes angular doc */
+}
 
+a:hover {
+    box-shadow: none;
+}
+
+.settings-modal article {
+    min-width: 900px;
+}
 
 /* split.js */
 .split, .gutter.gutter-horizontal, #left, #right {
@@ -66,6 +76,10 @@
   cursor: default;
   background: $sidebarBackground;
   box-shadow: inset -1px 0 $sidebarBorder;
+}
+
+.tree h2, .tree h3 {
+    margin: 0;
 }
 
 .tree a:hover {

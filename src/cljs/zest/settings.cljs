@@ -271,7 +271,7 @@
                    )))]
      (if @so-indexing
        [:p (str
-             "Indexing : "
+             "Indexing: "
              (.toFixed
                (* 100 (/ (or @so-grep-progress 0)
                          (or @so-archives-total 1)))
@@ -280,7 +280,6 @@
              (or @so-index-progress 0)
              " indexing")]
        [:button {:on-click (fn []
-                             (reset! so-indexing true)
                              (start-so-grepping))}
         "Create index"])]
 
@@ -365,7 +364,7 @@
           (fn [docs] (reset! available-devdocs docs)))
 
         [:div
-         {:class "modal"}
+         {:class "modal settings-modal"}
          [:input
           {:type      "checkbox"
            :checked   @visible
