@@ -251,23 +251,25 @@
 (defn so-widget []
   (if @so-archives-available
     [:div
-     [:p "Suggested tags (select ones you want in your index):"]
-     [:ul
+     [:ul {:class "collection with-header"}
+      [:li {:class "collection-header"}
+       "Suggested tags (select ones you want in your index):"]
       (doall (for [tag suggested-tags]
                (do ^{:key (str "so_tags_" tag)}
-                   [:li
-                    [:label
-                     [:input {:type     "checkbox"
-                              :checked  (get @so-index-tags tag)
-                              :disabled @so-indexing
-                              :on-change
-                                        (fn []
-                                          (if (nil? (get @so-index-tags tag))
-                                            (reset! so-index-tags
-                                                    (conj @so-index-tags tag))
-                                            (reset! so-index-tags
-                                                    (disj @so-index-tags tag))))}]
-                     [:span {:class "checkable"} tag]]]
+                   [:li {:class "collection-item"}
+                    [:input {:type     "checkbox"
+                             :id       (str "so_tag_cb_" tag)
+                             :checked  (get @so-index-tags tag)
+                             :disabled @so-indexing
+                             :on-change
+                                       (fn []
+                                         (if (nil? (get @so-index-tags tag))
+                                           (reset! so-index-tags
+                                                   (conj @so-index-tags tag))
+                                           (reset! so-index-tags
+                                                   (disj @so-index-tags tag))))}]
+                    [:label {:for   (str "so_tag_cb_" tag)
+                             :class "checkable"} tag]]
                    )))]
      (if @so-indexing
        [:p (str
@@ -280,7 +282,8 @@
              (or @so-index-progress 0)
              " indexing")]
        [:button {:on-click (fn []
-                             (start-so-grepping))}
+                             (start-so-grepping))
+                 :class "btn center-align"}
         "Create index"])]
 
     [:div
@@ -345,86 +348,120 @@
            (if @index-done (on-done)
                            (reset! db-done true))))))
 
-(defn register-settings []
-  (let [available-devdocs (reagent/atom [])
-        installed-devdocs zest.docs.registry/installed-devdocs-atom
-        path (.require js/window "path")
+(def available-devdocs (reagent/atom []))
+(def installed-devdocs zest.docs.registry/installed-devdocs-atom)
+
+(defn settings-modal []
+  (let [path (.require js/window "path")
         rimraf (.require js/window "rimraf")
         shell (.require js/window "shell")]
+    [:div
+     {:class "modal"
+      :id    "settings-modal"}
+
+     [:div {:class "modal-content"}
+      [:h4 "Settings"]
+      [:div {:class "row"}
+       [:div {:class "col s6"}
+        [:h5 "Your documentation"]
+        [:ul {:class "collection"}
+         (doall (for [doc @installed-devdocs]
+                  ^{:key (str "installeddoc_" doc)}
+                  [:li {:class "collection-item"} doc
+                   [:a
+                    {:class "secondary-content"
+                     :href  "#"
+                     :on-click
+                            (fn []
+                              (rimraf
+                                (.join path
+                                       (zest.docs.registry/get-devdocs-root)
+                                       doc)
+                                #(zest.docs.registry/update-installed-devdocs)))}
+                    [:i {:class "material-icons"} "delete"]]]))]]
+       [:div {:class "col s6"}
+        [:h5 "Available documentation"]
+        [:ul {:class "collapsible"}
+         [:li {:class    "collapsible-header"
+               :on-click #(reset! devdocs-visible
+                                  (not @devdocs-visible))} "from "
+          [:a {:on-click
+               #(.openExternal shell "http://devdocs.io/")}
+           "DevDocs - http://devdocs.io/"]
+          [:a
+           {:class "secondary-content"
+            :href  "#"}
+           [:i {:class "material-icons"} "expand_more"]]]
+         (if @devdocs-visible
+           [:ul {:class "collection"}
+            (doall (for [doc @available-devdocs]
+                     (if (= -1 (.indexOf @installed-devdocs
+                                         (.-slug doc)))
+                       ^{:key (str "availabledoc_" (.-slug doc))}
+                       (if (contains? @downloading (.-slug doc))
+                         [:li {:class "collection-item"}
+                          (str "downloading " (.-slug doc) "... "
+                               (get @downloading (.-slug doc))
+                               "%")]
+                         [:li {:class "collection-item"}
+                          [:a
+                           {:on-click #(download-devdocs
+                                        (.-slug doc)
+                                        (aget doc "db_size"))
+                            :href     "#"}
+                           (.-slug doc)]
+                          [:a
+                           {:class    "secondary-content"
+                            :on-click #(download-devdocs
+                                        (.-slug doc)
+                                        (aget doc "db_size"))
+                            :href     "#"}
+                           [:i {:class "material-icons"} "cloud_download"]]]))))])
+
+         [:li {:class    "collapsible-header"
+               :on-click #(reset! so-visible
+                                  (not @so-visible))}
+          "from " [:a {:on-click
+                       #(.openExternal shell "http://stackoverflow.com/")}
+                   "Stack Overflow - http://stackoverflow.com/"]
+          [:a
+           {:class "secondary-content"
+            :href  "#"}
+           [:i {:class "material-icons"} "expand_more"]]]
+         (if @so-visible (so-widget))]]]]
+
+     [:div {:class "modal-footer"}
+      [:a {:class "modal-action modal-close btn-flat"}
+       "Close"]]]))
+
+(defn register-settings []
+  (let [modal-class
+        (reagent/create-class
+          {:component-did-mount
+           (fn []
+             (if (and
+                   @visible
+                   (not
+                     (.is (.$ js/window "#settings-modal") ":visible")))
+               (.openModal
+                 (.$ js/window "#settings-modal"))))
+
+           :reagent-render
+           settings-modal})]
     (set!
       (.-showSettings js/window)
       (fn []
-        (reset! visible false)                              ; without setting to false, the sequence
-        ; "show -> hide with ESC -> show" doesn't work
-        (reset! visible true)))
+        (do
+          ; showing again doesn't work after hiding unless we re-set to false
+          (if (not
+                (.is (.$ js/window "#settings-modal") ":visible"))
+            (do
+              (reset! visible false)
+              (reset! visible true))))))
 
     (if @visible
       (do
         (zest.docs.registry/get-available-devdocs
           (fn [docs] (reset! available-devdocs docs)))
-
-        [:div
-         {:class "modal settings-modal"}
-         [:input
-          {:type      "checkbox"
-           :checked   @visible
-           :id        "settingsModal"
-           :on-change (fn [e]
-                        (let [v (-> e .-target .-checked)]
-                          (reset! visible v)))}]
-         [:label {:for "settingsModal" :class "overlay"}]
-         [:article
-          [:header
-           [:h3 "Settings"]
-           [:label {:for                     "settingsModal" :class "close"
-                    :dangerouslySetInnerHTML {:__html "&times;"}}]]
-          [:section
-           [:div {:class "row"}
-            [:div {:class "half"}
-             [:h3 "Your documentation"]
-             [:ul
-              (doall (for [doc @installed-devdocs]
-                       ^{:key (str "installeddoc_" doc)}
-                       [:li (str doc " | ")
-                        [:a
-                         {:on-click
-                          (fn []
-                            (rimraf
-                              (.join path
-                                     (zest.docs.registry/get-devdocs-root)
-                                     doc)
-                              #(zest.docs.registry/update-installed-devdocs)))}
-                         "remove"]]))]]
-            [:div {:class "half"}
-             [:h3 "Available documentation"]
-
-             [:p "from " [:a {:on-click
-                              #(.openExternal shell "http://devdocs.io/")}
-                          "DevDocs - http://devdocs.io/"]]
-             [:a {:on-click #(reset! devdocs-visible
-                                     (not @devdocs-visible))}
-              (if @devdocs-visible "hide" "show")]
-             (if @devdocs-visible
-               [:ul (doall (for [doc @available-devdocs]
-                             (if (= -1 (.indexOf @installed-devdocs
-                                                 (.-slug doc)))
-                               ^{:key (str "availabledoc_" (.-slug doc))}
-                               [:li
-                                (if (contains? @downloading (.-slug doc))
-                                  [:span (str "downloading " (.-slug doc) "... "
-                                              (get @downloading (.-slug doc))
-                                              "%")]
-                                  [:a
-                                   {:on-click #(download-devdocs
-                                                (.-slug doc)
-                                                (aget doc "db_size"))}
-                                   (.-slug doc)])])))])
-
-             [:p "from " [:a {:on-click
-                              #(.openExternal shell "http://stackoverflow.com/")}
-                          "Stack Overflow - http://stackoverflow.com/"]]
-             [:a {:on-click #(reset! so-visible
-                                     (not @so-visible))}
-              (if @so-visible "hide" "show")]
-             (if @so-visible (so-widget))]]]]])
+        [modal-class])
       [:div])))

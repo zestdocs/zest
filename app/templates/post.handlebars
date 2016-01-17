@@ -1,8 +1,8 @@
 <div class="row question">
     <div class="span16">
-        <h1>
+        <h3>
             {{ post.Title }}
-        </h1>
+        </h3>
         <div class="post-stats-vertical">
             <div class="post-stat">
                 <p class="post-stat-value {% if post.score < 0 %}post-stat-value-poor{% endif %}">
@@ -57,7 +57,7 @@
 <div class="row answers">
     <div class="span16">
         {{#if post.answers}}
-        <h1 class="answers">{{ post.answers.length }} answer{{#ifPlural post.answers.length}}s{{/ifPlural}}</h1>
+        <h3 class="answers">{{ post.answers.length }} answer{{#ifPlural post.answers.length}}s{{/ifPlural}}</h3>
         <ul class="answers">
             {{#each post.answers }}
             <li id="answer-{{ Id }}">

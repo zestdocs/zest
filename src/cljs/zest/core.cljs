@@ -231,13 +231,16 @@
 
      section
      (fn [docset type]
-       [:ul (for
-              [entry (get-in @docset-type-items [docset type])]
-              ^{:key (str docset "_" (.-name type) "_" (.-path entry) "_" (.-name entry))}
-              [:li
-               [:a
-                {:on-click #(activate-item docset entry)}
-                (.-name entry)]])])
+       [:div {:class "collection"}
+        (for
+          [entry (get-in @docset-type-items [docset type])]
+          ^{:key (str docset "_" (.-name type) "_" (.-path entry) "_" (.-name entry))}
+
+           [:a
+            {:class "collection-item"
+             :href "#"
+             :on-click #(activate-item docset entry)}
+            (.-name entry)])])
 
      refresh
      (fn []
@@ -250,18 +253,19 @@
      fts-suggestions
      (fn []
        (if (> (count @search-results) 0)
-         (do [:div {:class "fts"}
-              [:h2 "See also"]
-              [:h3 "Stack Overflow:"]
-              [:ul {:class "fts-results"}
-               (map
-                 (fn [res] ^{:key res}
-                 [:li
-                  [:a
-                   {:on-click #(activate-item "stackoverflow"
-                                              (nth (.split res ";") 0))}
-                   (nth (.split res ";") 1)]])
-                 @search-results)]])
+         (do [:div {:class "collection with-header"}
+              [:div {:class "collection-header z-depth-1"}
+               [:strong "Stack Overflow"]]
+              (map
+                (fn [res] ^{:key res}
+
+                 [:a
+                  {:href "#"
+                   :class "collection-item"
+                   :on-click #(activate-item "stackoverflow"
+                                             (nth (.split res ";") 0))}
+                  (nth (.split res ";") 1)])
+                @search-results)])
          [:div]))]
 
     (reagent/create-class
@@ -304,47 +308,50 @@
                    (fn [e]
                      (let [q (-> e .-target .-value)]
                        (set-query q)))}]
-           [:div {:class "tree"}
+           [:div {:class "collapsible tree"}
             (if (= 0 (count @results))
               (doall (for [docset
                            (map (fn [x] {:name x :label x}) @docsets-list)]
                        ^{:key (:name docset)}
                        [:div
-                        [:h2 [:a
-                              {:on-click
-                               (fn []
-                                 (if (nil? (get @docset-types (:name docset)))
-                                   (reset! docset-types (assoc @docset-types (:name docset)
-                                                                             (.-types (get-from-cache (:name docset)))))
-                                   (reset! docset-types (dissoc @docset-types (:name docset)))))}
-                              (:label docset)]]
+                        [:div {:class "collapsible-header"
+                               :on-click
+                                      (fn []
+                                        (if (nil? (get @docset-types (:name docset)))
+                                          (reset! docset-types (assoc @docset-types (:name docset)
+                                                                                    (.-types (get-from-cache (:name docset)))))
+                                          (reset! docset-types (dissoc @docset-types (:name docset)))))}
+                         (:label docset)]
                         (doall (for [type (get @docset-types (:name docset))]
                                  (let []
                                    ^{:key (str (:name docset) "/" (.-name type))}
-                                   [:ul
-                                    [:h3 [:a {:on-click
-                                              (fn []
-                                                (if (nil? (get-in @docset-type-items [(:name docset) type]))
-                                                  (reset! docset-type-items (assoc-in @docset-type-items [(:name docset) type]
-                                                                                      (filter
-                                                                                        #(= (.-type %) (.-name type))
-                                                                                        (.-entries (get-from-cache (:name docset))))))
-                                                  (reset! docset-type-items (dissoc (get @docset-type-items (:name docset)) type))))}
+                                   [:div {:class "collapsible level2"}
+                                    [:div {:class "collapsible-header"
+                                           :on-click
+                                                  (fn []
+                                                    (if (nil? (get-in @docset-type-items [(:name docset) type]))
+                                                      (reset! docset-type-items
+                                                              (assoc-in @docset-type-items [(:name docset) type]
+                                                                        (filter
+                                                                          #(= (.-type %) (.-name type))
+                                                                          (.-entries (get-from-cache (:name docset))))))
+                                                      (reset! docset-type-items
+                                                              (dissoc (get @docset-type-items (:name docset)) type))))}
 
-                                          (.-name type)]]
-                                    [section (:name docset) type]])))]))
-              (doall (for [[i item] (map-indexed vector @results)]
-                       ^{:key (str @query (str i))}
-                       [:label {:class "stack"}
-                        [:input
-                         {:type     "radio"
-                          :name     "stack"
-                          :checked  (= @index i)
-                          :on-click (fn []
-                                      (reset! index i)
-                                      (refresh)
-                                      (.focus (.getElementById js/document "searchInput")))}]
-                        [:span {:class "button toggle"} (.-name (.-contents item))]])))
+                                     (.-name type)]
+                                   [section (:name docset) type]])))]))
+              [:div {:class "collection"} (doall (for [[i item] (map-indexed vector @results)]
+                                                   ^{:key (str @query (str i))}
+                                                   [:a
+                                                    {:class    (if (= @index i) "collection-item active"
+                                                                                "collection-item")
+                                                     :href "#"
+                                                     :on-click (fn []
+                                                                 (reset! index i)
+                                                                 (refresh)
+                                                                 (.focus (.getElementById js/document "searchInput")))}
+                                                    (.-name (.-contents item))]
+                                                   ))])
             (if (> (count @query) 0) (fts-suggestions))]]
           [right-class]
           [zest.settings/register-settings]])})))
@@ -354,10 +361,8 @@
   (set! (.-onkeydown js/document)
         (fn [e]
           (if (= (.-keyCode e) 27)
-            (let [modals (.querySelectorAll js/document ".modal > [type=checkbox]")]
-              (doall (for [modal (aclone modals)]
-                       (do
-                         (set! (.-checked modal) false))))))))
+            (do
+              (.closeModal (.$ js/window ".modal"))))))
   (reagent/render
     [main-page]
     (.getElementById js/document "app")))
