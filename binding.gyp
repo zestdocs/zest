@@ -9,6 +9,8 @@
           "-std=c++11", "-stdlib=libc++", "-mmacosx-version-min=10.7", "-fexceptions"
         ],
       },
+      "cflags!": [ "-fno-exceptions" ],
+      "cflags_cc!": [ "-fno-exceptions" ],
       "include_dirs": [
         "/usr/local/include/lucene++",
         "/usr/local/include"
