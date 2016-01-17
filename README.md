@@ -1,7 +1,7 @@
 
 # zest
 
-Early Proof of Concept prototype. Contains hardcoded paths to my home directory, is my first ClojureScript project ever, etc. Not meant for release, published just in case someone wants to collaborate.
+Early Proof of Concept prototype. It's my first ClojureScript project ever, I haven't decided about the license, etc. Not really meant for release, published mostly in case someone wants to collaborate.
 
 ## Requirements
 
