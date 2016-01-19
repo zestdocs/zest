@@ -3,46 +3,56 @@
   (:require [cljs.core.async :as async]))
 
 (def cur-searchers (atom {}))
-(def cur-searcher-lines (atom {}))
-(def searching (atom {}))
+(def cur-searchers-lines (atom nil))
+(def searching (atom #{}))
 
 (defn new-searcher [path]
   (let [child-process (.require js/window "child_process")
-        searcher (.spawn child-process "searcher" (array path))
-        Lazy (.require js/window "lazy")]
+        last (atom "")
+        ch (async/chan 100)
+        searcher (.spawn child-process "searcher" (array path))]
     (reset! cur-searchers (assoc @cur-searchers path searcher))
-    (reset! cur-searcher-lines
-            (assoc @cur-searcher-lines
-              path
-              (.-lines (Lazy. (.-stdout searcher)))))))
+    (reset! cur-searchers-lines (assoc @cur-searchers-lines path ch))
+    (.on
+      (.-stdout searcher)
+      "data"
+      (fn [data]
+        (let [lines (.split (str @last (.toString data "utf8")) "\n")]
+          (go-loop []
+                   (if (> (.-length lines) 1)
+                     (do
+                       (async/>! ch (.shift lines))
+                       (recur))
+                     (reset! last (.shift lines)))))))))
 
 (def search-num (atom 0))
 
 (defn search [index query]
   (let [res (async/chan)
+        res-data (array)
         cur-search-num (+ 1 @search-num)]
-    (reset! search-num (+ 1 @search-num))
-    (.join
-      (.map (.takeWhile
-              (get @cur-searcher-lines index)
-              (fn [l] (not (= "END" (.toString l "utf8")))))
-            (fn [l] (.toString l "utf8")))
-      (fn [ret]
-        (go
-          ; avoid old queries overwriting later results
-          (if (= cur-search-num @search-num)
-            (async/>! res ret))
-          (reset! searching (dissoc @searching index)))))
-
+    (reset! search-num cur-search-num)
     (if (contains? @searching index)
       (do (.kill (get @cur-searchers index) "SIGKILL")
-          ; avoid spawning too many searchers that are not killed
-          (if (= cur-search-num @search-num)
-            (new-searcher index))))
-    (reset! searching (assoc @searching index res))
+          (new-searcher index)))
+    (reset! searching (conj @searching index))
     (.write (.-stdin (get @cur-searchers index)) (str query "\n"))
+    (go-loop
+      []
+      ; avoid old queries hijacking new queries' lines
+      ; or overwriting new queries' results
+      (if (= cur-search-num @search-num)
+        (let [line (async/<! (get @cur-searchers-lines index))]
+          (if (not (= "END" line))
+            (do (.push res-data line)
+                (recur))
+            ; again, avoid old queries overwriting later results
+            (if (= cur-search-num @search-num)
+              (go
+                (async/>! res res-data)
+                (reset! searching (disj @searching index))))))))
     res))
 
 (defn stop-all-searchers []
-  (for [s (vals @cur-searchers)]
-    (.kill s "SIGKILL")))
+  (doall (for [s (vals @cur-searchers)]
+           (.kill s "SIGKILL"))))

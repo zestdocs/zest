@@ -72,14 +72,11 @@
       (let [prep-query (.replace @query #"\s+$" "")]
         (go (reset! search-results
                     (async/<! (zest.searcher/search so-index prep-query)))
-            (if (and (= (count @search-results) 0)
-                     ; poor performance with short strings followed by '*'
-                     ;        (>= (count prep-query) 3))
-                     (reset!
-                       search-results
-                       (async/<! (zest.searcher/search
-                                   so-index
-                                   (str prep-query "*"))))))))
+            (if (= (count @search-results) 0)
+              (reset!
+                search-results
+                (async/<!
+                  (zest.searcher/search so-index (str prep-query "*")))))))
       (reset!
         results
         (concat
@@ -259,7 +256,7 @@
              entry-path (.-path (.-contents entry))]
          ;(if (= "__FTS__" entry-path)
          ;  (fts-results (.search search-index @query) #(async-set-html % (fn [])))
-           (activate-item (.-docset entry) (.-contents entry))))
+         (activate-item (.-docset entry) (.-contents entry))))
 
      fts-suggestions
      (fn []
