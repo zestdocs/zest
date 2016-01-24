@@ -48,9 +48,8 @@
                 (recur))
             ; again, avoid old queries overwriting later results
             (if (= cur-search-num @search-num)
-              (go
-                (async/>! res res-data)
-                (reset! searching (disj @searching index))))))))
+              (async/>! res res-data)
+              (reset! searching (disj @searching index)))))))
     res))
 
 (defn stop-all-searchers []

@@ -7,7 +7,8 @@
             [zest.settings]
             [zest.docs.registry]
             [zest.docs.stackoverflow]
-            [zest.searcher]))
+            [zest.searcher]
+            [zest.docs.devdocs]))
 
 (def so-db
   (let [levelup (.require js/window "levelup")
@@ -17,53 +18,17 @@
 
 (def so-index
   (let
-    [path (.require js/window "path")]
+    [mkdirp (.require js/window "mkdirp")
+     path (.require js/window "path")]
+    (.sync mkdirp (zest.docs.registry/get-so-root))
     (.join path (zest.docs.registry/get-so-root) "lucene")))
 
-(def so-hl-index
-  (let [mkdirp (.require js/window "mkdirp")
-        LuceneIndex
-        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
-    (.sync mkdirp (zest.docs.registry/get-so-root))
-    (LuceneIndex. so-index)))
 
 (def query (reagent/atom ""))
 (def results (reagent/atom []))
 (def search-results (reagent/atom []))
 (def index (reagent/atom 0))
 
-(def docset-db-cache (js-obj))
-(def docset-cache (js-obj))
-
-(defn get-from-cache [dir]
-  (if (nil? (aget docset-cache dir))
-    (let [path (.require js/window "path")
-          fs (.require js/window "fs")
-          devdocs-root (zest.docs.registry/get-devdocs-root)
-          json (.parse js/JSON
-                       (.readFileSync
-                         (.require js/window "fs")
-                         (.join path devdocs-root dir "index.json") "utf8"))]
-
-
-      (aset docset-cache dir json)
-      (aset docset-db-cache dir
-            (.parse js/JSON (.readFileSync
-                              fs
-                              (.join path devdocs-root dir "db.json")
-                              "utf8")))
-      json)
-    (aget docset-cache dir)))
-
-(defn get-entries [dir]
-  (map #(js-obj "docset" dir "contents" %)
-       (.-entries (get-from-cache dir))))
-
-(defn get-all-entries [data]
-  (apply concat (map (fn [x] (get-entries x)) data)))
-
-(def entries
-  (reagent/atom (get-all-entries @zest.docs.registry/installed-devdocs-atom)))
 
 (defn set-query [q]
   (reset! query q)
@@ -86,7 +51,9 @@
                        (=
                          (.indexOf (.-name (.-contents r)) q)
                          0))
-                     @entries))))
+                     @zest.docs.devdocs/entries))
+          [(js-obj "contents" (js-obj "path" "__FTS__"
+                                      "name" "More DevDocs results..."))]))
       (reset! index 0))))
 
 (defn render-so-post [data]
@@ -127,28 +94,41 @@
      input-focus (reagent/atom false)
      focus-id (reagent/atom nil)
 
+     LuceneIndex
+     (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
+     path (.require js/window "path")
+
+     get-search-index #(LuceneIndex.
+                        (.join path (zest.docs.registry/get-devdocs-root)
+                               "lucene"))
+
      fts-results
      (fn [files cb]
        (let
          [res (reagent/atom "")
           i (reagent/atom 0)
-          path (.require js/window "path")
+          search-index (get-search-index)
 
           next
           (fn next []
-            (.get
-              so-db
-              (nth (.split (nth files @i) ";") 0)
-              (fn [e ret]
+            (let [docset (nth (.split (nth files @i) "/") 0)
+                  path (.join (.slice (.split (nth files @i) "/") 1) "/")]
+              (zest.docs.devdocs/get-from-cache docset)
+              (let [db-cache (aget zest.docs.devdocs/docset-db-cache docset)]
                 (reset!
                   res
                   (str
                     @res
-                    "<h2>" (nth (.split (nth files @i) ";") 1) "</h2>"
+                    "<h5><a href='javascript:openDoc(\""
+                    docset "\", \"" path "\""
+                    ")'>"
+                    (nth files @i)
+                    "</a></h5>"
                     (.highlight
-                      so-hl-index
-                      (escape-html (zest.docs.stackoverflow/unfluff
-                                     (.-Body (.parse js/JSON ret))))
+                      search-index
+                      (escape-html
+                        (zest.docs.stackoverflow/unfluff
+                          (aget db-cache path)))
                       @query)))
                 (if (< @i (- (count files) 1))
                   (do (reset! i (+ @i 1)) (next))
@@ -214,6 +194,7 @@
 
      activate-item
      (fn [docset entry]
+       (.log js/console docset entry)
        (if (= docset "stackoverflow")
          (let []
            (set! (.-scrollTop (.getElementById js/document "right")) 0)
@@ -223,7 +204,7 @@
              (fn [e json]
                (let [data (.parse js/JSON json)]
                  (go (async-set-html (async/<! (render-so-post data)) #()))))))
-         (let [response (aget (aget docset-db-cache docset)
+         (let [response (aget (aget zest.docs.devdocs/docset-db-cache docset)
                               (nth (.split (.-path entry) "#") 0))]
            (let [new-hash (nth (.split (.-path entry) "#") 1)]
              (if (= @html response)
@@ -255,9 +236,10 @@
      (fn []
        (let [entry (nth @results @index)
              entry-path (.-path (.-contents entry))]
-         ;(if (= "__FTS__" entry-path)
-         ;  (fts-results (.search search-index @query) #(async-set-html % (fn [])))
-         (activate-item (.-docset entry) (.-contents entry))))
+         (if (= "__FTS__" entry-path)
+           (fts-results (.search (get-search-index) @query)
+                        #(async-set-html % (fn [])))
+           (activate-item (.-docset entry) (.-contents entry)))))
 
      fts-suggestions
      (fn []
@@ -276,6 +258,10 @@
                  (nth (.split res ";") 1)])
                 @search-results)])
          [:div]))]
+
+    (set! (.-openDoc js/window)
+          (fn [docset item]
+            (activate-item docset (js-obj "path" item))))
 
     (reagent/create-class
       {
@@ -323,13 +309,17 @@
                            (map (fn [x] {:name x :label x}) @docsets-list)]
                        ^{:key (:name docset)}
                        [:div
-                        [:div {:class "collapsible-header"
+                        [:div {:class
+                               "collapsible-header"
                                :on-click
-                                      (fn []
-                                        (if (nil? (get @docset-types (:name docset)))
-                                          (reset! docset-types (assoc @docset-types (:name docset)
-                                                                                    (.-types (get-from-cache (:name docset)))))
-                                          (reset! docset-types (dissoc @docset-types (:name docset)))))}
+                               (fn []
+                                 (if (nil? (get @docset-types (:name docset)))
+                                   (reset!
+                                     docset-types
+                                     (assoc @docset-types
+                                       (:name docset)
+                                       (.-types (zest.docs.devdocs/get-from-cache (:name docset)))))
+                                   (reset! docset-types (dissoc @docset-types (:name docset)))))}
                          (:label docset)]
                         (doall (for [type (get @docset-types (:name docset))]
                                  (let []
@@ -343,7 +333,7 @@
                                                               (assoc-in @docset-type-items [(:name docset) type]
                                                                         (filter
                                                                           #(= (.-type %) (.-name type))
-                                                                          (.-entries (get-from-cache (:name docset))))))
+                                                                          (.-entries (zest.docs.devdocs/get-from-cache (:name docset))))))
                                                       (reset! docset-type-items
                                                               (dissoc (get @docset-type-items (:name docset)) type))))}
 
@@ -380,7 +370,8 @@
   (.log js/console "make-devdocs-loop")
   (go-loop []
            (let [data (async/<! zest.docs.registry/installed-devdocs-chan)]
-             (reset! entries (get-all-entries data))
+             (reset! zest.docs.devdocs/entries
+                     (zest.docs.devdocs/get-all-entries data))
              (if (> (count @query) 0)
                (set-query @query))
              (recur))))

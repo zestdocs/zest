@@ -1,11 +1,14 @@
 (ns zest.settings
-  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [cljs.core.async :as async]
             [reagent.core :as reagent]
-            [zest.docs.registry]))
+            [zest.docs.registry]
+            [zest.docs.devdocs]))
 
 (def visible (reagent/atom false))
 (def devdocs-visible (reagent/atom false))
+(def devdocs-reindexing (reagent/atom false))
+(def devdocs-reindexing-progress (reagent/atom ""))
 (def so-visible (reagent/atom false))
 (def downloading (reagent/atom {}))
 (def so-indexing (reagent/atom false))
@@ -28,6 +31,63 @@
       (and
         (.existsSync fs done-filename)
         (.isFile (.statSync fs done-filename))))))
+
+(defn async-add-file [idx name contents]
+  (let [ret (async/chan)]
+    (.setImmediate
+      js/window #(go (.addFile idx name contents)
+                     (async/>! ret true)))
+    ret))
+
+(defn devdocs-rebuild-index []
+  (reset! devdocs-reindexing true)
+  (reset! devdocs-reindexing-progress "")
+  (let [path (.require js/window "path")
+        rimraf (.require js/window "rimraf")
+        fs (.require js/window "fs-extra")
+        LuceneIndex
+        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
+        idx (LuceneIndex. (.join path (zest.docs.registry/get-devdocs-root)
+                                 "new_lucene"))
+        all-count (count @zest.docs.registry/installed-devdocs-atom)
+        indexed-count (atom 0)
+
+        check-done
+        (fn []
+          (reset! indexed-count (inc @indexed-count))
+          (if (= @indexed-count all-count)
+            (do (reset! devdocs-reindexing false)
+                (.endWriting idx)
+                (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "lucene"))
+                (.move
+                  fs
+                  (.join path (zest.docs.registry/get-devdocs-root) "new_lucene")
+                  (.join path (zest.docs.registry/get-devdocs-root) "lucene")
+                  (fn [])))
+            (reset! devdocs-reindexing-progress
+                    (str @indexed-count "/" all-count))))]
+    (if (> all-count 0)
+      (do
+        (.startWriting idx)
+        (doall
+          (for [docset @zest.docs.registry/installed-devdocs-atom]
+            (do
+              (zest.docs.devdocs/get-from-cache docset)
+              (let [db-cache (aget zest.docs.devdocs/docset-db-cache docset)
+                    keys (.keys js/Object db-cache)
+                    i (atom 0)]
+                (go-loop []
+                         (if (< @i (.-length keys))
+                           (do (async/<! (async-add-file
+                                           idx
+                                           (str docset "/" (nth keys @i))
+                                           (zest.docs.stackoverflow/unfluff
+                                             (aget db-cache (nth keys @i)))))
+                               (reset! i (inc @i))
+                               (recur))
+                           (check-done))))))))
+      (reset! devdocs-reindexing false))))
+
 
 (def
   SO-URL
@@ -300,7 +360,7 @@
         db-done (atom false)
         db-data (atom "")
         db-bytes (atom 0)
-        doc-dir (.join path (zest.docs.registry/get-devdocs-root) slug)
+        doc-dir (.join path (zest.docs.registry/get-devdocs-docs-root) slug)
 
         on-done
         (fn []
@@ -347,7 +407,16 @@
       [:div {:class "row"}
        [:div {:class "col s6"}
         [:h5 "Your documentation"]
-        [:ul {:class "collection"}
+        [:ul {:class "collection with-header"}
+         [:li {:class "collection-header"}
+          [:b "DevDocs:"]
+          (if @devdocs-reindexing
+            [:span {:class "secondary-content"}
+             (str "Rebuilding index... " @devdocs-reindexing-progress)]
+            [:a {:href     "#"
+                 :class    "secondary-content"
+                 :on-click #(devdocs-rebuild-index)}
+             "Rebuild FTS index"])]
          (doall (for [doc @installed-devdocs]
                   ^{:key (str "installeddoc_" doc)}
                   [:li {:class "collection-item"} doc
@@ -358,7 +427,7 @@
                             (fn []
                               (rimraf
                                 (.join path
-                                       (zest.docs.registry/get-devdocs-root)
+                                       (zest.docs.registry/get-devdocs-docs-root)
                                        doc)
                                 #(zest.docs.registry/update-installed-devdocs)))}
                     [:i {:class "material-icons"} "delete"]]]))]]

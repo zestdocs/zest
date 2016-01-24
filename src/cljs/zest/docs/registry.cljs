@@ -3,6 +3,7 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async]))
 
+
 (defn get-so-root []
   (let [electron (.require js/window "electron")
         path (.require js/window "path")]
@@ -16,6 +17,10 @@
     (.join path
            (.getDataPath (.-app (.-remote electron)))
            "devdocs")))
+
+(defn get-devdocs-docs-root []
+  (let [path (.require js/window "path")]
+    (.join path (get-devdocs-root) "docs")))
 
 (defn get-available-devdocs [cb]
   (let [electron (.require js.window "electron")
@@ -34,7 +39,7 @@
                      (.writeFileSync fs devdocs-json body)
                      (cb (.parse js/JSON body)))))]
 
-    (.sync mkdirp (get-devdocs-root))
+    (.sync mkdirp (get-devdocs-docs-root))
     (if (and (.existsSync fs devdocs-json)
              (.isFile (.statSync fs devdocs-json)))
       (try
@@ -51,8 +56,8 @@
   (let
     [fs (.require js/window "fs")
      mkdirp (.require js/window "mkdirp")]
-    (.sync mkdirp (get-devdocs-root))
-    (.readdirSync fs (get-devdocs-root))))
+    (.sync mkdirp (get-devdocs-docs-root))
+    (.readdirSync fs (get-devdocs-docs-root))))
 
 (def installed-devdocs-atom (reagent/atom
                               (zest.docs.registry/get-installed-devdocs)))

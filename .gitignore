@@ -30,7 +30,7 @@ sogrep/extractor
 sogrep/sogrep
 sogrep/Makefile
 nodelucene/searcher
-nocelucene/Makefile
+nodelucene/Makefile
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake

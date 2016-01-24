@@ -32,7 +32,6 @@ target_compile_options(
 
 target_link_libraries(
         extractor
-        leveldb
         ${LIBARCHIVE_LIBRARIES}
 )
 target_include_directories(
