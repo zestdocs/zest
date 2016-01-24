@@ -90,7 +90,6 @@ XMLSize_t ZeroSeparatedBinFileInputStream::readBytes(XMLByte *const toFill, cons
     done += ret;
     if (done - prevStatus >= 10000*1000) {
         time_t dt = time(nullptr) - t0;
-        const long long all = 9601970627 + 30613095889;
         std::cout << done << std::endl;
         prevStatus = done;
     }

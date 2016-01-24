@@ -96,33 +96,35 @@
                  "")
                (reset! so-archives-available true)))))))
 
-(defn open-so-archive [name op]
+(defn run-so-extractor [additional-args pipe-stdout-to]
   (let [child-process (.require js/window "child_process")
         path (.require js/window "path")]
     (.spawn
       child-process
-      "7z"
-      (array
-        op
-        "-so"
-        (.join path (zest.docs.registry/get-so-root)
-               "archive" "stackexchange" (str "stackoverflow.com-" name ".7z"))
-        (str name ".xml")))))
+      "extractor"
+      (.concat
+        (array
+          (.join path (zest.docs.registry/get-so-root)
+                 "archive" "stackexchange" (str "stackoverflow.com-Posts.7z"))
+          (.join path (zest.docs.registry/get-so-root)
+                 "archive" "stackexchange" (str "stackoverflow.com-Comments.7z")))
+        additional-args)
+      (if (nil? pipe-stdout-to)
+        (js-obj)
+        (js-obj
+          "stdio"
+          (array "ignore" (.-stdin pipe-stdout-to) "ignore"))))))
 
-(defn archive-size [name]
-  (let [Lazy (.require js/window "lazy")
-        ret (async/chan)]
-    (.forEach (.-lines (Lazy. (.-stdout (open-so-archive name "l"))))
-              (fn [line-buf]
-                (if (not (undefined? line-buf))
-                  (let [line (.toString line-buf "utf8")]
-                    (if (not (= -1 (.indexOf line (str name ".xml"))))
-                      (go
-                        (.log js/console line)
-                        (async/>! ret
-                                  (.parseFloat
-                                    js/window
-                                    (nth (.split line #"\s+") 3)))))))))
+(defn get-so-archive-sizes-sum []
+  (let [ret (async/chan)
+        ret-str (atom "")
+        process (run-so-extractor (array "sizes") nil)]
+    (.on (.-stdout process) "data"
+         #(reset! ret-str (+ @ret-str (.toString % "utf8"))))
+    (.on (.-stdout process) "end"
+         #(let [vals (.split @ret-str " ")]
+           (go (async/>! ret (+ (.parseFloat js/window (nth vals 0))
+                                (.parseFloat js/window (nth vals 1)))))))
     ret))
 
 (defn start-so-indexing []
@@ -204,43 +206,25 @@
         path (.require js/window "path")]
     (.sync rimraf (.join path (zest.docs.registry/get-so-root) "new_index"))
     (.sync mkdirp (.join path (zest.docs.registry/get-so-root) "new_index"))
-    (go (let [comments-size (async/<! (archive-size "Comments"))
-              posts-size (async/<! (archive-size "Posts"))
+    (go (let [so-archives-total-val (async/<! (get-so-archive-sizes-sum))
               child-process (.require js/window "child_process")
               Lazy (.require js/window "lazy")
-              Buffer (.-Buffer (.require js/window "buffer"))
               sogrep (.spawn child-process "sogrep"
                              (apply array @so-index-tags)
                              (js-obj "cwd"
                                      (.join path
                                             (zest.docs.registry/get-so-root)
                                             "new_index")))
-              p7zip-posts (open-so-archive "Posts" "x")]
+              extractor (run-so-extractor (array) nil)]
+          (.pipe (.-stdout extractor)
+                 (.-stdin sogrep))
+          (reset! so-archives-total so-archives-total-val)
           (reset! so-indexing true)
-          (.pipe (.-stdout p7zip-posts)
-                 (.-stdin sogrep)
-                 (js-obj "end" false))
-          (reset! so-archives-total (+ posts-size comments-size))
           (reset! so-grep-progress 0)
-          (.on (.-stderr p7zip-posts) "data"
-               (fn [data]
-                 (.log js/console (.toString data "utf8"))))
           (.on sogrep "close"
                (fn [code]
                  (.log js/console "sogrep exited with code" code)
                  (if (= 0 code) (start-so-indexing))))
-          (.on p7zip-posts "close"
-               (fn [code]
-                 (.log js/console "7z x posts exited with code" code)
-                 (let [p7zip-comments (open-so-archive "Comments" "x")]
-                   (.pipe (.-stdout p7zip-comments)
-                          (.-stdin sogrep))
-                   (.on p7zip-comments "close"
-                        (fn [code]
-                          (.log js/console
-                                "7z x comments exited with code" code)))
-                   (.write (.-stdin sogrep) (Buffer. (array 0))) ; null separator
-                   )))
           (.forEach (.-lines (Lazy. (.-stdout sogrep)))
                     (fn [line]
                       (reset! so-grep-progress
@@ -274,16 +258,15 @@
      (if @so-indexing
        [:p (str
              "Indexing: "
-             (.toFixed
-               (* 100 (/ (or @so-grep-progress 0)
-                         (or @so-archives-total 1)))
-               2)
+             (.toFixed (* 100 (/ (or @so-grep-progress 0)
+                                 (or @so-archives-total 1)))
+                       2)
              "% filtering, "
              (or @so-index-progress 0)
              " indexing")]
        [:button {:on-click (fn []
                              (start-so-grepping))
-                 :class "btn center-align"}
+                 :class    "btn center-align"}
         "Create index"])]
 
     [:div

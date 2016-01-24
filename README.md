@@ -9,6 +9,7 @@ Early Proof of Concept prototype. It's my first ClojureScript project ever, I ha
 * Leiningen 2.5.3
 * Recent node.js
 * Lucene++ (available at https://github.com/luceneplusplus/LucenePlusPlus)
+* libarchive
 * [NSIS](http://nsis.sourceforge.net/)
 
 On Mac/Linux, installing node.js using [Node Version Manager](https://github.com/creationix/nvm) is recommended.
@@ -174,4 +175,4 @@ furnished to do so, subject to the following conditions:
 
 DevDocs downloader, Stack Overflow torrent downloader, and Stack Overflow indexer are now implemented in the "Settings" modal.
 
-`7z`, `sogrep`, and `searcher` binaries need to be in PATH. (`sogrep` and `searcher` can be built from the `sogrep/` and `nodelucene/` directories respectively - `cmake . && make` should do it, given installed xerces, leveldb and rapidjson)
+`extractor`, `sogrep`, and `searcher` binaries need to be in PATH. (`extractor`+`sogrep` and `searcher` can be built from the `sogrep/` and `nodelucene/` directories respectively - `cmake . && make` should do it, given installed libarchive, xerces, leveldb, rapidjson, and Lucene++)

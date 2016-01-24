@@ -3,16 +3,16 @@ project(sogrep)
 
 find_package(PkgConfig)
 pkg_search_module(XERCES REQUIRED xerces-c)
+pkg_search_module(LIBARCHIVE REQUIRED libarchive)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
-set(SOURCE_FILES main.cpp)
 
 link_directories(
         "/usr/local/lib"
         ${XERCES_LIBRARY_DIRS}
 )
-add_executable(sogrep ${SOURCE_FILES})
+add_executable(sogrep main.cpp)
+add_executable(extractor extractor.cpp)
 target_link_libraries(
         sogrep
         leveldb
@@ -28,4 +28,21 @@ target_compile_options(
         sogrep
         PUBLIC
         ${XERCES_CFLAGS_OTHER}
+)
+
+target_link_libraries(
+        extractor
+        leveldb
+        ${LIBARCHIVE_LIBRARIES}
+)
+target_include_directories(
+        extractor
+        PUBLIC
+        "/usr/local/include"
+        ${LIBARCHIVE_INCLUDE_DIRS}
+)
+target_compile_options(
+        extractor
+        PUBLIC
+        ${LIBARCHIVE_CFLAGS_OTHER}
 )

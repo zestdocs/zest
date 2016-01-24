@@ -21,10 +21,11 @@
     (.join path (zest.docs.registry/get-so-root) "lucene")))
 
 (def so-hl-index
-  (let [path (.require js/window "path")
+  (let [mkdirp (.require js/window "mkdirp")
         LuceneIndex
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))]
-    (LuceneIndex. (.join path (zest.docs.registry/get-so-root) "lucene"))))
+    (.sync mkdirp (zest.docs.registry/get-so-root))
+    (LuceneIndex. so-index)))
 
 (def query (reagent/atom ""))
 (def results (reagent/atom []))

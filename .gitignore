@@ -26,6 +26,7 @@ node_modules
 *.iml
 SearchIndex
 app/build
+sogrep/extractor
 sogrep/sogrep
 sogrep/Makefile
 nodelucene/searcher
