@@ -357,3 +357,7 @@ p.page-actions {
     margin: 1rem 0.8rem;
     margin-left: -0.4rem;
 }
+
+html {
+    font-size: 100%;
+}
