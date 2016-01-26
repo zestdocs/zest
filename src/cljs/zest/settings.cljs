@@ -167,7 +167,9 @@
           (.join path (zest.docs.registry/get-so-root)
                  "archive" "stackexchange" (str "stackoverflow.com-Posts.7z"))
           (.join path (zest.docs.registry/get-so-root)
-                 "archive" "stackexchange" (str "stackoverflow.com-Comments.7z")))
+                 "archive" "stackexchange" (str "stackoverflow.com-Comments.7z"))
+          (.join path (zest.docs.registry/get-so-root)
+                 "archive" "stackexchange" (str "stackoverflow.com-Users.7z")))
         additional-args)
       (if (nil? pipe-stdout-to)
         (js-obj)
@@ -184,7 +186,8 @@
     (.on (.-stdout process) "end"
          #(let [vals (.split @ret-str " ")]
            (go (async/>! ret (+ (.parseFloat js/window (nth vals 0))
-                                (.parseFloat js/window (nth vals 1)))))))
+                                (.parseFloat js/window (nth vals 1))
+                                (.parseFloat js/window (nth vals 2)))))))
     ret))
 
 (defn start-so-indexing []
@@ -250,7 +253,7 @@
                    (str (.-Id data) ";" (.-Title data))
                    (render-blob
                      (async/<!
-                       (zest.docs.stackoverflow/process-so-post data))))
+                       (zest.docs.stackoverflow/process-so-post data false))))
                  (reset! done (+ @done 1))
                  (if (= 0 (mod @done 100))
                    (reset! so-index-progress @done))

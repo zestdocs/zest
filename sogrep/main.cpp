@@ -130,13 +130,14 @@ class MySAXHandler : public HandlerBase {
 
 
     bool comments = false;
+    bool users = false;
 
     map<string, int> commentCounts;
     map<string, int> answerCounts;
 
 public:
     void setComments() { comments = true; }
-
+    void setUsers() { users = true; }
 
     const std::string jsonize(AttributeList &attrs) {
         StringBuffer s;
@@ -159,7 +160,14 @@ public:
 
     void startElement(const XMLCh* const, AttributeList& attrs) {
         if (attrs.getValue("Id") != nullptr) {
-            if (comments) {
+            if (users) {
+                const string UserId = ch2str(attrs.getValue("Id"));
+                db->Put(
+                    leveldb::WriteOptions(),
+                    "u_"+UserId,
+                    jsonize(attrs)
+                );
+            } else if (comments) {
                 const string PostId = ch2str(attrs.getValue("PostId"));
                 map<string, int>::iterator match = commentCounts.find(PostId);
                 if (match != commentCounts.end()) {
@@ -260,6 +268,10 @@ int main(int argc, const char ** argv) {
 
     ZeroSeparatedBinFileInputStream::next();
     handler->setComments();
+    parser->parse(src);
+
+    ZeroSeparatedBinFileInputStream::next();
+    handler->setUsers();
     parser->parse(src);
 
     delete db;

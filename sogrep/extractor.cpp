@@ -35,13 +35,17 @@ void extract(char* filename) {
 }
 
 int main(int argc, char** argv) {
-    if (argc == 4 && strcmp(argv[3], "sizes") == 0) {
+    if (argc == 5 && strcmp(argv[4], "sizes") == 0) {
         print_size(argv[1]);
         std::cout << " ";
         print_size(argv[2]);
+        std::cout << " ";
+        print_size(argv[3]);
     } else {
         extract(argv[1]); // Path to Posts.xml 7z file
         write(STDOUT_FILENO, "\0", 1); // null separator, as expected in main.cpp
         extract(argv[2]); // Path to Comments.xml 7z file
+        write(STDOUT_FILENO, "\0", 1); // null separator, as expected in main.cpp
+        extract(argv[3]); // Path to Users.xml 7z file
     }
 }

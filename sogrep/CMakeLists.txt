@@ -5,10 +5,11 @@ find_package(PkgConfig)
 pkg_search_module(XERCES REQUIRED xerces-c)
 pkg_search_module(LIBARCHIVE REQUIRED libarchive)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -L${XERCES_LIBRARY_DIRS} -L${LIBARCHIVE_LIBRARY_DIRS}")
 
 link_directories(
         "/usr/local/lib"
+        ${LIBARCHIVE_LIBRARY_DIRS}
         ${XERCES_LIBRARY_DIRS}
 )
 add_executable(sogrep main.cpp)

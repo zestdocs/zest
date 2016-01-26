@@ -80,7 +80,7 @@
             (.log js/console data)
             (tpl (js-obj "post" data))))]
     (go (render-template (async/<!
-                           (zest.docs.stackoverflow/process-so-post data))))))
+                           (zest.docs.stackoverflow/process-so-post data true))))))
 
 (defn main-page
   []
@@ -203,6 +203,8 @@
              (str "p_" entry)
              (fn [e json]
                (let [data (.parse js/JSON json)]
+                 (aset (.getElementById js/document "right") "className"
+                       "")
                  (go (async-set-html (async/<! (render-so-post data)) #()))))))
          (let [response (aget (aget zest.docs.devdocs/docset-db-cache docset)
                               (nth (.split (.-path entry) "#") 0))]
@@ -310,7 +312,8 @@
                        ^{:key (:name docset)}
                        [:div
                         [:div {:class
-                               "collapsible-header"
+                               (str "collapsible-header _list-item _icon-"
+                                    (:name docset))
                                :on-click
                                (fn []
                                  (if (nil? (get @docset-types (:name docset)))

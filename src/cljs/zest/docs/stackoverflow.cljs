@@ -16,7 +16,7 @@
     (.write parser html)
     @res))
 
-(defn process-so-post [data]
+(defn process-so-post [data with-users]
   (let
     [process-tags
      (fn [tags]
@@ -31,7 +31,17 @@
              cStream (.createReadStream
                        zest.core/so-db
                        (js-obj "gt" (str "c_" (.-Id answer) "_")
-                               "lt" (str "c_" (.-Id answer) "_a")))]
+                               "lt" (str "c_" (.-Id answer) "_a")))
+
+             all (atom 0)
+             done (atom 0)
+             ended (atom false)
+
+             check-finished
+             (fn []
+               (.log js/console @all @done)
+               (if (and @ended (= @all @done)) (go (async/>! ret ret-data))))]
+
          (aset ret-data "comments" (array))
          (aset ret-data "Tags" (process-tags (aget ret-data "Tags")))
          (if (and (aget data "AcceptedAnswerId")
@@ -40,12 +50,21 @@
 
          (.on cStream "data"
               (fn [v]
+                (reset! all (inc @all))
                 (let [comment (.parse js/JSON (.-value v))]
-                  (.push (aget ret-data "comments") comment))))
-
-         (.on cStream "end"
-              (fn []
-                (go (async/>! ret ret-data))))
+                  (.push (aget ret-data "comments") comment)
+                  (if (and with-users (nil? (.-UserDisplayName comment)))
+                    (.get zest.core/so-db (str "u_" (.-UserId comment))
+                          (fn [e ret]
+                            (.log js/console ret)
+                            (aset comment "UserDisplayName"
+                                  (.-DisplayName (.parse js/JSON ret)))
+                            (reset! done (inc @done))
+                            (check-finished)))
+                    (reset! done (inc @done))))))
+         (.on cStream "end" (fn []
+                              (reset! ended true)
+                              (check-finished)))
          ret))
 
      ret-data data
@@ -79,13 +98,13 @@
                                    "lt" (str "a_" (.-Id data) "_a")))]
              (.on aStream "data"
                   (fn [v]
-                    (reset! started (+ @started 1))
+                    (reset! started (inc @started))
                     (let [answer (.parse js/JSON (.-value v))]
                       (go
                         (let [ans-data (async/<!
                                          (process-answer answer))]
                           (.push (aget ret-data "answers") ans-data)
-                          (reset! finished (+ @finished 1))
+                          (reset! finished (inc @finished))
                           (check-finished))))))
              (.on aStream "end"
                   (fn []

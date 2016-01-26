@@ -352,3 +352,8 @@ p.page-actions {
 .importinprogress .subinfo, .errormessage .subinfo {
     color: #999999;
 }
+
+.collapsible-header._list-item:before {
+    margin: 1rem 0.8rem;
+    margin-left: -0.4rem;
+}

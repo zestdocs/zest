@@ -23,13 +23,13 @@
         <div class="post-metadata">
             <div class="post-user">
                 <p>asked on <strong>{{ post.CreationDate }}</strong></p>
-                {{!-- {{ macros.user_card(post.ownerUser) }} --}}
+                {{ post.OwnerDisplayName }}
             </div>
 
             {{#if post.lastEditorUser}}
             <div class="post-user">
                 <p>last edited <strong>{{ post.LastActivityDate }}</strong></p>
-                {{!--  {{ macros.user_card(post.lastEditorUser) }} --}}
+                {{ post.LastEditorDisplayName }}
             </div>
             {{/if}}
             <div class="post-tags">
@@ -81,13 +81,13 @@
                 <div class="post-metadata">
                     <div class="post-user">
                         <p>answered on <strong>{{ CreationDate }}</strong></p>
-{{!--                         {{ macros.user_card(a.ownerUser) }} --}}
+                        {{ OwnerDisplayName }}
                     </div>
 
                     {{#if LastEditorUser}}
                     <div class="post-user">
                         <p>last edited <strong>{{ LastEditDate }}</strong></p>
-{{!--                         {{ macros.user_card(a.lastEditorUser) }} --}}
+                        {{ LastEditorDisplayName }}
                     </div>
                     {{/if}}
                     <div class="post-actions">
