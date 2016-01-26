@@ -161,7 +161,7 @@
         path (.require js/window "path")]
     (.spawn
       child-process
-      "extractor"
+      (zest.core/get-binary-path "extractor")
       (.concat
         (array
           (.join path (zest.docs.registry/get-so-root)
@@ -272,7 +272,8 @@
     (go (let [so-archives-total-val (async/<! (get-so-archive-sizes-sum))
               child-process (.require js/window "child_process")
               Lazy (.require js/window "lazy")
-              sogrep (.spawn child-process "sogrep"
+              sogrep (.spawn child-process
+                             (zest.core/get-binary-path "sogrep")
                              (apply array @so-index-tags)
                              (js-obj "cwd"
                                      (.join path

@@ -186,4 +186,4 @@ SOFTWARE.
 
 DevDocs downloader, Stack Overflow torrent downloader, and Stack Overflow indexer are now implemented in the "Settings" modal.
 
-`extractor`, `sogrep`, and `searcher` binaries need to be in PATH. (`extractor`+`sogrep` and `searcher` can be built from the `sogrep/` and `nodelucene/` directories respectively - `cmake . && make` should do it, given installed libarchive, xerces, leveldb, rapidjson, and Lucene++)
+`extractor`, `sogrep`, and `searcher` binaries need to be in the root directory of this repo. (`extractor`+`sogrep` and `searcher` can be built from the `sogrep-src/` and `nodelucene/` directories respectively - `cmake . && make` should do it, given installed libarchive, xerces, leveldb, rapidjson, and Lucene++)

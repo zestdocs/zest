@@ -218,7 +218,7 @@ function deleteExtraResources(paths) {
 // Tasks
 //------------------------------------------------------------------------------
 
-grunt.registerTask('release', ['cljsbuild-prod', 'prepare-release', 'release-linux', 'release-mac', 'release-win']);
+grunt.registerTask('release', ['cljsbuild-prod', 'prepare-release', 'release-linux']);
 
 grunt.registerTask('cljsbuild-prod', function() {
   grunt.log.writeln("\nCleaning and building ClojureScript production files...");

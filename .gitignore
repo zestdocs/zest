@@ -26,11 +26,14 @@ node_modules
 *.iml
 SearchIndex
 app/build
-sogrep/extractor
-sogrep/sogrep
-sogrep/Makefile
+sogrep-src/extractor
+sogrep-src/sogrep
+sogrep-src/Makefile
 nodelucene/searcher
 nodelucene/Makefile
+extractor
+sogrep
+searcher
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake

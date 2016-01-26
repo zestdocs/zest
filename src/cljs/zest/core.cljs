@@ -10,6 +10,11 @@
             [zest.searcher]
             [zest.docs.devdocs]))
 
+(defn get-binary-path [filename]
+  (let [dir (.-__dirname js/window)
+        path (.require js/window "path")]
+    (.join path (.dirname path dir) filename)))
+
 (def so-db
   (let [levelup (.require js/window "levelup")
         path (.require js/window "path")]
@@ -230,7 +235,7 @@
                         #(async-set-html
                           %
                           (fn [] (set! (.-scrollTop
-                                   (.getElementById js/document "right")) 0))))
+                                         (.getElementById js/document "right")) 0))))
            (activate-item (.-docset entry) (.-contents entry)))))
 
      render-item
