@@ -227,7 +227,10 @@
              entry-path (.-path (.-contents entry))]
          (if (= "__FTS__" entry-path)
            (fts-results (.search (get-search-index) @query)
-                        #(async-set-html % (fn [])))
+                        #(async-set-html
+                          %
+                          (fn [] (set! (.-scrollTop
+                                   (.getElementById js/document "right")) 0))))
            (activate-item (.-docset entry) (.-contents entry)))))
 
      render-item
