@@ -219,6 +219,30 @@
                  (async-set-html response #(set-hash new-hash))
                  (set-600ms-focus)))))))
 
+     refresh
+     (fn []
+       (let [entry (nth @results @index)
+             entry-path (.-path (.-contents entry))]
+         (if (= "__FTS__" entry-path)
+           (fts-results (.search (get-search-index) @query)
+                        #(async-set-html % (fn [])))
+           (activate-item (.-docset entry) (.-contents entry)))))
+
+     render-item
+     (fn [i item]
+       [:a
+        {:class    (str (if (= @index i) "collection-item active"
+                                         "collection-item")
+                        (if (not (= (.-path (.-contents item)) "__FTS__"))
+                          (str " _list-item " "_icon-" (.-docset item))
+                          ""))
+         :href     "#"
+         :on-click (fn []
+                     (reset! index i)
+                     (refresh)
+                     (.focus (.getElementById js/document "searchInput")))}
+        (.-name (.-contents item))])
+
      section
      (fn [docset type]
        [:div {:class "collection"}
@@ -231,15 +255,6 @@
             :href     "#"
             :on-click #(activate-item docset entry)}
            (.-name entry)])])
-
-     refresh
-     (fn []
-       (let [entry (nth @results @index)
-             entry-path (.-path (.-contents entry))]
-         (if (= "__FTS__" entry-path)
-           (fts-results (.search (get-search-index) @query)
-                        #(async-set-html % (fn [])))
-           (activate-item (.-docset entry) (.-contents entry)))))
 
      fts-suggestions
      (fn []
@@ -264,22 +279,7 @@
             (activate-item docset (js-obj "path" item))))
 
     (reagent/create-class
-      {
-       ;(.addEventListener
-       ;  js/window
-       ;  "resize"
-       ;  (fn [event]
-       ;    (let [w (.-innerWidth js/window)
-       ;          h (.-innerHeight js/window)]
-       ;      (do
-       ;        (reset! width
-       ;                (str (- w
-       ;                        (js/parseInt (-> (.getElementById js/document "left") .-style .-width))
-       ;                        10)
-       ;                     "px"))
-       ;        (.log js/console @width))))))
-
-       :reagent-render
+      {:reagent-render
        (fn []
          [:div {:style {:height "100%"}}
           [:div {:id "left"}
@@ -341,15 +341,7 @@
                                     [section (:name docset) type]])))]))
               [:div {:class "collection"} (doall (for [[i item] (map-indexed vector @results)]
                                                    ^{:key (str @query (str i))}
-                                                   [:a
-                                                    {:class    (if (= @index i) "collection-item active"
-                                                                                "collection-item")
-                                                     :href     "#"
-                                                     :on-click (fn []
-                                                                 (reset! index i)
-                                                                 (refresh)
-                                                                 (.focus (.getElementById js/document "searchInput")))}
-                                                    (.-name (.-contents item))]
+                                                   (render-item i item)
                                                    ))])
             (if (> (count @query) 0) (fts-suggestions))]]
           [right-class]
