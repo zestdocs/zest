@@ -30,10 +30,131 @@
 
 
 (def query (reagent/atom ""))
+(def query-immediate (reagent/atom nil))
+(def query-timeout (reagent/atom nil))
+(def nonfts-results (reagent/atom []))
+(def nonfts-cursor (atom nil))
 (def results (reagent/atom []))
 (def search-results (reagent/atom []))
 (def index (reagent/atom 0))
 
+(defn normalize-str [s]
+  (->
+    s
+    (.toLowerCase)
+    (.replace "..." "")
+    (.replace (js/RegExp. "\\ event$") "")
+    (.replace (js/RegExp. "\\.+" "g") ".")
+    (.replace (js/RegExp. "\\(\\w+?\\)$") "")
+    (.replace (js/RegExp. "\\s" "g") "")
+    (.replace "()" "")
+    ; separators:
+    (.replace (js/RegExp. "\\:?\\ |#|::|->|\\$(?=\\w)" "g") ".")))
+
+; ported from DevDocs' searcher.coffee
+(defn score-exact [value query]
+  (let [value (normalize-str value)
+        query (normalize-str query)
+        index (.indexOf value query)]
+    (if (= index -1)
+      0
+      (let [score (atom 100)]
+        ; Remove one point for each unmatched character.
+        (reset! score (- @score (- (.-length value)
+                                   (.-length query))))
+        (reset!
+          score
+          (if (> index 0)
+            (if (= (.charAt value (- index 1)) ".")
+              (+ @score (- index 1))
+              ; (1) Remove one point for each unmatched character up to
+              ;     the nearest preceding dot or the beginning of the
+              ;     string.
+              ; (2) Remove one point for each unmatched character
+              ;     following the query.
+              (let [i (atom (- index 2))]
+                (while (and (>= @i 0) (not= (.charAt value @i) "."))
+                  (reset! i (dec @i)))
+                (- @score
+                   (+ (- index @i)                          ; (1)
+                      (- (.-length value) (.-length query) index)))))
+            @score)) ; (2)
+
+        ; Remove one point for each dot preceding the query, except for the
+        ; one immediately before the query.
+        (reset! score
+                (let [i (atom (- index 2))
+                      separators (atom 0)]
+                  (while (>= @i 0)
+                    (if (= (.charAt value @i) ".")
+                      (reset! separators (inc @separators)))
+                    (reset! i (dec @i)))
+                  (- @score @separators)))
+
+        ; Remove five points for each dot following the query.
+        (reset! score
+                (let [i (atom (- (.-length value) (.-length query) index 1))
+                      separators (atom 0)]
+                  (while (>= @i 0)
+                    (if (= (.charAt value (+ index (.-length query) @i)) ".")
+                      (reset! separators (inc @separators)))
+                    (reset! i (dec @i)))
+                  (- @score (* 5 @separators))))
+
+        @score))))
+
+(defn do-match-chunks [query reset]
+  (if (not-empty @nonfts-cursor)
+    (let [chunk (first @nonfts-cursor)
+          new-results
+          (->>
+            chunk
+            (map (fn [v] [(score-exact (.-name (.-contents v)) query) v]))
+            (filter #(> (first %) 0))
+            (take 100))]
+      (reset! nonfts-cursor (rest @nonfts-cursor))
+
+      (if (and reset (not-empty new-results))
+        ; reset only after something was found
+        (reset! nonfts-results []))
+
+      (reset!
+        nonfts-results
+        (concat @nonfts-results new-results))
+
+      (if (or (and reset (empty? new-results))
+              (< (count @nonfts-results) 100))
+        (reset! query-immediate
+                (.setImmediate js/window
+                               #(do-match-chunks
+                                 query
+                                 (and reset (= 0 (count new-results)))))))))
+
+  (if (and (empty? @nonfts-cursor) reset)
+    (reset! nonfts-results []))
+
+  (if (or (empty? @nonfts-cursor)
+          (>= (count @nonfts-results) 8))
+    ; show only after finished searching or if found at least 8 results,
+    ; to avoid flickering of the list
+    (reset!
+      results
+      (concat
+        (->>
+          @nonfts-results
+          (sort-by #(- (first %)))
+          (map #(second %)))
+        [(js-obj "contents" (js-obj "path" "__FTS__"
+                                    "name" "More DevDocs results..."))]))))
+
+(defn match-chunks [entries query]
+  (if (not (nil? @query-immediate))
+    (.clearImmediate js/window @query-immediate))
+  (if (not (nil? @query-timeout))
+    (.clearTimeout js/window @query-timeout))
+  (reset! nonfts-cursor (partition-all 2000 entries))
+  (reset! query-timeout
+          (.setTimeout js/window #(do-match-chunks query true) 0)))
 
 (defn set-query [q]
   (reset! query q)
@@ -48,17 +169,7 @@
                 search-results
                 (async/<!
                   (zest.searcher/search so-index (str prep-query "*")))))))
-      (reset!
-        results
-        (concat
-          (take 10 (filter
-                     (fn [r]
-                       (=
-                         (.indexOf (.-name (.-contents r)) q)
-                         0))
-                     @zest.docs.devdocs/entries))
-          [(js-obj "contents" (js-obj "path" "__FTS__"
-                                      "name" "More DevDocs results..."))]))
+      (match-chunks @zest.docs.devdocs/entries q)
       (reset! index 0))))
 
 (defn render-so-post [data]

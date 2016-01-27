@@ -2,7 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async]
-            [zest.docs.registry]))
+            [zest.docs.registry]
+            [medley.core :refer [interleave-all]]))
 
 (def docset-cache (js-obj))
 (def docset-db-cache (js-obj))
@@ -33,7 +34,8 @@
        (.-entries (zest.docs.devdocs/get-from-cache dir))))
 
 (defn get-all-entries [data]
-  (apply concat (map (fn [x] (get-entries x)) data)))
+  ; interleave to give each docset equal chance of being found
+  (apply interleave-all (map (fn [x] (get-entries x)) data)))
 
 (def entries
   (reagent/atom (get-all-entries @zest.docs.registry/installed-devdocs-atom)))
