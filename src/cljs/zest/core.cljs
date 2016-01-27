@@ -2,6 +2,7 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async]
+            [clojure.set :refer [union]]
             [cljsjs.react]
             [goog.net.XhrIo]
             [zest.settings]
@@ -31,8 +32,8 @@
 
 (def query (reagent/atom ""))
 (def query-immediate (reagent/atom nil))
-(def query-timeout (reagent/atom nil))
 (def nonfts-results (reagent/atom []))
+(def nonfts-keys (atom #{}))
 (def nonfts-cursor (atom nil))
 (def results (reagent/atom []))
 (def search-results (reagent/atom []))
@@ -103,12 +104,14 @@
 
         @score))))
 
-(defn do-match-chunks [query reset]
+(defn do-match-chunks [query reset just-for-next-queries]
   (if (not-empty @nonfts-cursor)
     (let [chunk (first @nonfts-cursor)
+          key #(str (.-docset %) "/" (.-path (.-contents %)))
           new-results
           (->>
             chunk
+            (filter #(not (contains? @nonfts-keys (key %))))
             (map (fn [v] [(score-exact (.-name (.-contents v)) query) v]))
             (filter #(> (first %) 0))
             (take 100))]
@@ -118,23 +121,28 @@
         ; reset only after something was found
         (reset! nonfts-results []))
 
+      (reset! nonfts-keys
+              (union @nonfts-keys (set (map #(key (second %)) new-results))))
+
       (reset!
         nonfts-results
         (concat @nonfts-results new-results))
 
       (if (or (and reset (empty? new-results))
-              (< (count @nonfts-results) 100))
+              (< (count @nonfts-results) 2000))
         (reset! query-immediate
                 (.setImmediate js/window
                                #(do-match-chunks
                                  query
-                                 (and reset (= 0 (count new-results)))))))))
+                                 (and reset (= 0 (count new-results)))
+                                 (> (count @nonfts-results) 100)))))))
 
   (if (and (empty? @nonfts-cursor) reset)
     (reset! nonfts-results []))
 
-  (if (or (empty? @nonfts-cursor)
-          (>= (count @nonfts-results) 8))
+  (if (and (not just-for-next-queries)
+           (or (empty? @nonfts-cursor)
+               (>= (count @nonfts-results) 8)))
     ; show only after finished searching or if found at least 8 results,
     ; to avoid flickering of the list
     (reset!
@@ -150,11 +158,10 @@
 (defn match-chunks [entries query]
   (if (not (nil? @query-immediate))
     (.clearImmediate js/window @query-immediate))
-  (if (not (nil? @query-timeout))
-    (.clearTimeout js/window @query-timeout))
-  (reset! nonfts-cursor (partition-all 2000 entries))
-  (reset! query-timeout
-          (.setTimeout js/window #(do-match-chunks query true) 0)))
+  (reset! nonfts-cursor (cons (map #(second %) @nonfts-results)
+                              (partition-all 2000 entries)))
+  (reset! nonfts-keys #{})
+  (do-match-chunks query true false) 0)
 
 (defn set-query [q]
   (reset! query q)
