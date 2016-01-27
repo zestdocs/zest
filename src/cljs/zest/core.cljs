@@ -222,7 +222,7 @@
                (do
                  (reset! hash new-hash)
                  (aset (.getElementById js/document "right") "className"
-                       (str "_" docset))
+                       (str "_" (nth (.split docset "~") 1)))
                  (async-set-html response #(set-hash new-hash))
                  (set-600ms-focus)))))))
 
@@ -240,6 +240,7 @@
 
      render-item
      (fn [i item]
+       ^{:key (str @query (str i))}
        [:a
         {:class    (str (if (= @index i) "collection-item active"
                                          "collection-item")
@@ -321,7 +322,7 @@
                        [:div
                         [:div {:class
                                (str "collapsible-header _list-item _icon-"
-                                    (:name docset))
+                                    (nth (.split (:name docset) "~") 0))
                                :on-click
                                (fn []
                                  (if (nil? (get @docset-types (:name docset)))
@@ -351,7 +352,6 @@
                                      (.-name type)]
                                     [section (:name docset) type]])))]))
               [:div {:class "collection"} (doall (for [[i item] (map-indexed vector @results)]
-                                                   ^{:key (str @query (str i))}
                                                    (render-item i item)
                                                    ))])
             (if (> (count @query) 0) (fts-suggestions))]]
