@@ -32,6 +32,7 @@
 
 (def query (reagent/atom ""))
 (def query-immediate (reagent/atom nil))
+(def query-timeout (reagent/atom nil))
 (def nonfts-results (reagent/atom []))
 (def nonfts-keys (atom #{}))
 (def nonfts-cursor (atom nil))
@@ -104,64 +105,127 @@
 
         @score))))
 
+(defn query-to-fuzzy [query]
+  (let [escape-regexp (.require js/window "escape-regexp")
+        chars (.split query "")]
+    (js/RegExp. (.join
+                  (apply array (map #(escape-regexp %) chars))
+                  ".*?"))))
+
+(defn score-fuzzy-match [match-index match-len value]
+  (if (or
+        (= 0 match-index)
+        (= "." (.charAt value (- match-index 1))))
+    (max js/Math 66 (- 100 match-len))
+    (if (= (.-length value) (+ match-index match-len))
+      (max js/Math 33 (- 67 match-len))
+      (max js/Math 1 (- 34 match-len)))))
+
+(defn do-score-fuzzy [value query]
+  (let [re (query-to-fuzzy query)
+        match (.exec re value)
+        score (score-fuzzy-match (.-index match)
+                                 (.-length (nth match 0))
+                                 value)
+        i (+ 1 (.lastIndexOf value "."))
+        match2 (.exec re (.slice value i))]
+    (if (not (nil? match2))
+      (max js/Math score (score-fuzzy-match (+ i (.-index match2))
+                                            (.-length (nth match2 0))
+                                            value))
+      score)))
+
+(defn score-fuzzy [value query]
+  (let [fuzzysearch (.require js/window "fuzzysearch")
+        value (normalize-str value)
+        query (normalize-str query)]
+    (if (= -1 (.indexOf value query))
+      (if (fuzzysearch query value)
+        (do-score-fuzzy value query)
+        0)
+      0)))
+
+(def devdocs-key #(str (.-docset %) "/" (.-path (.-contents %))))
+
+(defn match-with-scorer [chunk query scorer]
+  (->>
+    chunk
+    (filter #(not (contains? @nonfts-keys (devdocs-key %))))
+    (map (fn [v] [(scorer (.-name (.-contents v)) query) v]))
+    (filter #(> (first %) 0))
+    (take 100)))
+
+(defn append-matches [chunk query scorer reset]
+  (let [new-results (match-with-scorer chunk query scorer)
+        res (atom false)]
+    (if (and reset (not-empty new-results))
+      ; reset only after something was found
+      (do
+        (reset! nonfts-results [])
+        (reset! res true)))
+
+    (reset! nonfts-keys
+            (union @nonfts-keys
+                   (set (map #(devdocs-key (second %)) new-results))))
+    (reset!
+      nonfts-results
+      (concat @nonfts-results new-results))
+
+    @res))
+
 (defn do-match-chunks [query reset just-for-next-queries]
   (if (not-empty @nonfts-cursor)
     (let [chunk (first @nonfts-cursor)
-          key #(str (.-docset %) "/" (.-path (.-contents %)))
-          new-results
-          (->>
-            chunk
-            (filter #(not (contains? @nonfts-keys (key %))))
-            (map (fn [v] [(score-exact (.-name (.-contents v)) query) v]))
-            (filter #(> (first %) 0))
-            (take 100))]
+          any-found (atom false)]
       (reset! nonfts-cursor (rest @nonfts-cursor))
 
-      (if (and reset (not-empty new-results))
-        ; reset only after something was found
-        (reset! nonfts-results []))
+      (reset! any-found
+              (append-matches chunk query score-exact reset))
 
-      (reset! nonfts-keys
-              (union @nonfts-keys (set (map #(key (second %)) new-results))))
+      (if (or (not @any-found)
+              (< (count @nonfts-results) 100))
+        (reset! any-found
+                (or @any-found
+                    (append-matches chunk query score-fuzzy
+                                    (and reset (not @any-found))))))
 
-      (reset!
-        nonfts-results
-        (concat @nonfts-results new-results))
-
-      (if (or (and reset (empty? new-results))
-              (< (count @nonfts-results) 2000))
+      (if (or (and reset any-found)
+              (< (count @nonfts-results) 500))
         (reset! query-immediate
                 (.setImmediate js/window
                                #(do-match-chunks
                                  query
-                                 (and reset (= 0 (count new-results)))
-                                 (> (count @nonfts-results) 100)))))))
+                                 (and reset (not @any-found))
+                                 (> (count @nonfts-results) 100)))))
 
-  (if (and (empty? @nonfts-cursor) reset)
-    (reset! nonfts-results []))
+      (if (and (empty? @nonfts-cursor) reset)
+        (reset! nonfts-results []))
 
-  (if (and (not just-for-next-queries)
-           (or (empty? @nonfts-cursor)
-               (>= (count @nonfts-results) 8)))
-    ; show only after finished searching or if found at least 8 results,
-    ; to avoid flickering of the list
-    (reset!
-      results
-      (concat
-        (->>
-          @nonfts-results
-          (sort-by #(- (first %)))
-          (map #(second %)))
-        [(js-obj "contents" (js-obj "path" "__FTS__"
-                                    "name" "More DevDocs results..."))]))))
+      (if (and (not just-for-next-queries)
+               (or (empty? @nonfts-cursor)
+                   (and @any-found (>= (count @nonfts-results) 8))))
+        ; show only after finished searching or if found at least 8 results,
+        ; to avoid flickering of the list
+        (reset!
+          results
+          (concat
+            (->>
+              @nonfts-results
+              (sort-by #(- (first %)))
+              (map #(second %)))
+            [(js-obj "contents" (js-obj "path" "__FTS__"
+                                        "name" "More DevDocs results..."))]))))))
 
 (defn match-chunks [entries query]
   (if (not (nil? @query-immediate))
     (.clearImmediate js/window @query-immediate))
+  (if (not (nil? @query-timeout))
+    (.clearTimeout js/window @query-timeout))
   (reset! nonfts-cursor (cons (map #(second %) @nonfts-results)
                               (partition-all 2000 entries)))
   (reset! nonfts-keys #{})
-  (do-match-chunks query true false) 0)
+  (reset! query-timeout
+          (.setTimeout js/window (do-match-chunks query true false) 15)))
 
 (defn set-query [q]
   (reset! query q)
