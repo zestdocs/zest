@@ -222,7 +222,7 @@
                (do
                  (reset! hash new-hash)
                  (aset (.getElementById js/document "right") "className"
-                       (str "_" (nth (.split docset "~") 1)))
+                       (str "_" (nth (.split docset "~") 0)))
                  (async-set-html response #(set-hash new-hash))
                  (set-600ms-focus)))))))
 
@@ -245,7 +245,8 @@
         {:class    (str (if (= @index i) "collection-item active"
                                          "collection-item")
                         (if (not (= (.-path (.-contents item)) "__FTS__"))
-                          (str " _list-item " "_icon-" (.-docset item))
+                          (str " _list-item " "_icon-"
+                               (nth (.split (.-docset item) "~") 0))
                           ""))
          :href     "#"
          :on-click (fn []
