@@ -77,8 +77,8 @@
                   (reset! i (dec @i)))
                 (- @score
                    (+ (- index @i)                          ; (1)
-                      (- (.-length value) (.-length query) index)))))
-            @score)) ; (2)
+                      (- (.-length value) (.-length query) index))))) ; (2)
+            @score))
 
         ; Remove one point for each dot preceding the query, except for the
         ; one immediately before the query.

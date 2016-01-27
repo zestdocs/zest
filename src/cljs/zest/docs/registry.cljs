@@ -8,14 +8,14 @@
   (let [electron (.require js/window "electron")
         path (.require js/window "path")]
     (.join path
-           (.getDataPath (.-app (.-remote electron)))
+           (.getPath (.-app (.-remote electron)) "userData")
            "so")))
 
 (defn get-devdocs-root []
   (let [electron (.require js/window "electron")
         path (.require js/window "path")]
     (.join path
-           (.getDataPath (.-app (.-remote electron)))
+           (.getPath (.-app (.-remote electron)) "userData")
            "devdocs")))
 
 (defn get-devdocs-docs-root []
@@ -29,7 +29,7 @@
         path (.require js/window "path")
         request (.require js/window "request")
         devdocs-json (.join path
-                            (.getDataPath (.-app (.-remote electron)))
+                            (.getPath (.-app (.-remote electron)) "userData")
                             "devdocs.json")
 
         fetch
