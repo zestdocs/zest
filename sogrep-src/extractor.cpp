@@ -1,6 +1,6 @@
 #include <cstring>
-#include <unistd.h>
 #include <iostream>
+#include <io.h>
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -29,7 +29,7 @@ void extract(char* filename) {
 
     archive_entry *entry;
     archive_read_next_header(a, &entry);
-    archive_read_data_into_fd(a, STDOUT_FILENO);
+    archive_read_data_into_fd(a, 1);
 
     archive_read_free(a);
 }
@@ -43,9 +43,9 @@ int main(int argc, char** argv) {
         print_size(argv[3]);
     } else {
         extract(argv[1]); // Path to Posts.xml 7z file
-        write(STDOUT_FILENO, "\0", 1); // null separator, as expected in main.cpp
+        _write(1, "\0", 1); // null separator, as expected in main.cpp
         extract(argv[2]); // Path to Comments.xml 7z file
-        write(STDOUT_FILENO, "\0", 1); // null separator, as expected in main.cpp
+        _write(1, "\0", 1); // null separator, as expected in main.cpp
         extract(argv[3]); // Path to Users.xml 7z file
     }
 }

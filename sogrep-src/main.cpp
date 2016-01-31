@@ -4,6 +4,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <ctime>
 
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
@@ -14,6 +15,7 @@
 #include <xercesc/util/BinFileInputStream.hpp>
 
 #include <leveldb/db.h>
+#include <io.h>
 
 using namespace rapidjson;
 using namespace std;
@@ -38,8 +40,8 @@ public:
 
 private:
     static XMLByte * buf;
+	static bool doNext;
     static XMLSize_t bufLen;
-    static bool doNext;
     static XMLSize_t done, prevStatus;
     static time_t t0;
 
@@ -60,7 +62,7 @@ time_t ZeroSeparatedBinFileInputStream::t0 = time(nullptr);
 
 XMLSize_t ZeroSeparatedBinFileInputStream::readBytes(XMLByte *const toFill, const XMLSize_t maxToRead) {
     XMLSize_t ret;
-    if (bufLen && doNext) {
+    if (buf != nullptr && doNext) {
         if (maxToRead <= bufLen) {
             copy(buf, buf + maxToRead, toFill);
             buf += maxToRead;
@@ -70,14 +72,16 @@ XMLSize_t ZeroSeparatedBinFileInputStream::readBytes(XMLByte *const toFill, cons
             copy(buf, buf + bufLen, toFill);
             ret = bufLen + BinFileInputStream::readBytes(toFill + bufLen, maxToRead - bufLen);
             bufLen = 0;
+			delete[] buf;
+			buf = nullptr;
             doNext = false;
         }
-    } else if (bufLen && !doNext) {
-        return 0;
-    } else {
-        XMLSize_t all = BinFileInputStream::readBytes(toFill, maxToRead);
+	} else if (buf != nullptr && !doNext) {
+		return 0;
+	} else {
+		XMLSize_t all = BinFileInputStream::readBytes(toFill, maxToRead);
         XMLByte * cur = toFill;
-        while ((cur - toFill < all) && *cur != '\0') ++cur;
+        while ((cur - toFill < all) && *cur != 0) ++cur;
         if (cur - toFill < all) {
             ret = (cur - toFill);
             bufLen = toFill + all - cur - 1;

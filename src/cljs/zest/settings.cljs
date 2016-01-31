@@ -47,8 +47,11 @@
         fs (.require js/window "fs-extra")
         LuceneIndex
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
-        idx (LuceneIndex. (.join path (zest.docs.registry/get-devdocs-root)
-                                 "new_lucene"))
+        idx (let [new-lucene-path (.join path
+                                         (zest.docs.registry/get-devdocs-root)
+                                         "new_lucene")]
+              (.sync rimraf new-lucene-path)
+              (LuceneIndex. new-lucene-path))
         docs-count (count @zest.docs.registry/installed-devdocs-atom)
         all-count (if (> docs-count 0)
                     (inc docs-count) 0)
@@ -61,19 +64,22 @@
             (do (reset! devdocs-reindexing false)
                 (.endWriting idx)
                 (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "lucene"))
-                (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols"))
                 (.move
                   fs
                   (.join path (zest.docs.registry/get-devdocs-root) "new_lucene")
                   (.join path (zest.docs.registry/get-devdocs-root) "lucene")
                   (fn []))
-                (.move
-                  fs
-                  (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")
-                  (.join path (zest.docs.registry/get-devdocs-root) "symbols")
+                (.close
+                  @zest.core/symbol-db
                   (fn []
-                    (zest.core/open-symbol-db
-                      #(zest.docs.registry/update-installed-devdocs))))) ; update query results
+                    (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols"))
+                    (.move
+                      fs
+                      (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")
+                      (.join path (zest.docs.registry/get-devdocs-root) "symbols")
+                      (fn []
+                        (zest.core/open-symbol-db
+                          #(zest.docs.registry/update-installed-devdocs))))))) ; update query results
             (reset! devdocs-reindexing-progress
                     (str @indexed-count "/" all-count))))]
     (if (> all-count 0)
@@ -244,23 +250,29 @@
           (if (and @ended (= @started @done))
             (do
               (.endWriting idx)
-              (.sync rimraf (.join path (zest.docs.registry/get-so-root) "lucene"))
-              (.sync rimraf (.join path (zest.docs.registry/get-so-root) "leveldb"))
-              (.move
-                fs
-                (.join path (zest.docs.registry/get-so-root) "new_index" "symbols")
-                (.join path (zest.docs.registry/get-so-root) "lucene")
-                (fn []))
-              (.move
-                fs
-                (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
-                (.join path (zest.docs.registry/get-so-root) "lucene")
-                (fn []))
-              (.move
-                fs
-                (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
-                (.join path (zest.docs.registry/get-so-root) "leveldb")
-                (fn [])))))]
+              (zest.searcher/stop-all-searchers)
+              (.close
+                @zest.core/so-db
+                (fn []
+                  (reset! zest.core/so-db db)
+                  (.sync rimraf (.join path (zest.docs.registry/get-so-root) "lucene"))
+                  (.sync rimraf (.join path (zest.docs.registry/get-so-root) "leveldb"))
+                  (.move
+                    fs
+                    (.join path (zest.docs.registry/get-so-root) "new_index" "symbols")
+                    (.join path (zest.docs.registry/get-so-root) "lucene")
+                    (fn []))
+                  (.move
+                    fs
+                    (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
+                    (.join path (zest.docs.registry/get-so-root) "lucene")
+                    (fn []))
+                  (.move
+                    fs
+                    (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
+                    (.join path (zest.docs.registry/get-so-root) "leveldb")
+                    (fn []))
+                  (reset! so-indexing false))))))]
     (.startWriting idx)
     (.on rStream "data"
          (fn [v]
@@ -273,7 +285,7 @@
                      (async/<!
                        (zest.docs.stackoverflow/process-so-post data false))))
                  (reset! done (+ @done 1))
-                 (if (= 0 (mod @done 100))
+                 (if (= 0 (mod @done 15))
                    (reset! so-index-progress @done))
                  (check-all-done)))))
     (.on rStream "end"
@@ -303,12 +315,14 @@
           (reset! so-archives-total so-archives-total-val)
           (reset! so-indexing true)
           (reset! so-grep-progress 0)
+          (.on extractor "close" #(.end (.-stdin sogrep)))
           (.on sogrep "close"
                (fn [code]
                  (.log js/console "sogrep exited with code" code)
                  (if (= 0 code) (start-so-indexing))))
           (.forEach (.-lines (Lazy. (.-stdout sogrep)))
                     (fn [line]
+                      (.log js/console (.toString line "utf8"))
                       (reset! so-grep-progress
                               (.parseFloat
                                 js/window

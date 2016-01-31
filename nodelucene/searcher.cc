@@ -3,7 +3,7 @@
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/filesystem.hpp>
 
-#include "LuceneIndex.h"
+#include "LuceneHeaders.h"
 #include "FileUtils.h"
 #include "FuzzyTermEnum.h"
 #include "Highlighter.h"

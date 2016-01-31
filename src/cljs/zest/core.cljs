@@ -17,10 +17,11 @@
     (.join path (.dirname path dir) filename)))
 
 (def so-db
-  (let [levelup (.require js/window "levelup")
-        path (.require js/window "path")]
-    (levelup (.join path (zest.docs.registry/get-so-root)
-                    "leveldb"))))
+  (atom
+    (let [levelup (.require js/window "levelup")
+          path (.require js/window "path")]
+      (levelup (.join path (zest.docs.registry/get-so-root)
+                      "leveldb")))))
 
 (def so-index
   (let
@@ -55,13 +56,13 @@
 
 (def symbol-db (atom nil))
 (defn open-symbol-db [cb] (let [path (.require js/window "path")
-                              sqlite3 (.require js/window "sqlite3")
-                              Database (.-Database sqlite3)
-                              db-path (.join path (zest.docs.registry/get-devdocs-root) "symbols")
-                              d (Database. db-path cb)]
-                          (.loadExtension d "sqlite_score/zest_score.sqlext"
-                                          (fn [e] (.log js/console e)))
-                          (reset! symbol-db d)))
+                                sqlite3 (.require js/window "sqlite3")
+                                Database (.-Database sqlite3)
+                                db-path (.join path (zest.docs.registry/get-devdocs-root) "symbols")
+                                d (Database. db-path cb)]
+                            (.loadExtension d "sqlite_score/zest_score.sqlext"
+                                            (fn [e] (.log js/console e)))
+                            (reset! symbol-db d)))
 
 (defn rebuild-symbol-db []
   (let [sqlite3 (.require js/window "sqlite3")
@@ -84,8 +85,8 @@
                  (if (empty? @docs)
                    (do
                      (.finalize prep)
-                     (.run db "COMMIT" #(reset! symbol-db db))
-                     (async/>! ret true))
+                     (.run db "COMMIT"
+                           (fn [] (.close db #(go (async/>! ret true))))))
                    (do
                      (if (= (mod @i 1000) 999)
                        (.log js/console (inc @i)))
@@ -165,7 +166,6 @@
               handlebars
               "ifPlural"
               (fn [var options]
-                (.log js/console var)
                 (if (not (= 1 (int var)))
                   (this-as js-this (.fn options js-this)))))
             (.registerPartial
@@ -291,11 +291,11 @@
      activate-item
      (fn [docset entry]
        (.log js/console docset entry)
-       (if (= docset "stackoverflow")
+       (if (= 0 (.indexOf docset "stackoverflow"))
          (let []
            (set! (.-scrollTop (.getElementById js/document "right")) 0)
            (.get
-             so-db
+             @so-db
              (str "p_" entry)
              (fn [e json]
                (let [data (.parse js/JSON json)]
@@ -366,8 +366,8 @@
               [:div {:class "collection-header z-depth-1"}
                [:strong "Stack Overflow"]]
               (map
-                (fn [res] ^{:key res}
-
+                (fn [res]
+                ^{:key (js/btoa (js/unescape (js/encodeURIComponent res)))}
                 [:a
                  {:href     "#"
                   :class    "collection-item"
@@ -475,7 +475,8 @@
 
 (defn before-figwheel-reload []
   (.log js/console "before")
-  (.close so-db)
+  (.close @so-db)
+  (.close @symbol-db)
   (zest.searcher/stop-all-searchers)
   (.removeEventListener
     (.-body js/document)

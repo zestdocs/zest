@@ -45,7 +45,7 @@
       ; or overwriting new queries' results
       (if (= cur-search-num @search-num)
         (let [line (async/<! (get @cur-searchers-lines index))]
-          (if (not (= "END" line))
+          (if (not= 0 (.indexOf line "END"))
             (do (.push res-data line)
                 (recur))
             ; again, avoid old queries overwriting later results

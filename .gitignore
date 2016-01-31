@@ -31,6 +31,17 @@ sogrep-src/sogrep
 sogrep-src/Makefile
 nodelucene/searcher
 nodelucene/Makefile
+*.exe
+*.dll
+*.lib
+*.exp
+*.obj
+*.dir
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.sdf
+*.opendb
 extractor
 sogrep
 searcher
@@ -40,3 +51,5 @@ cmake_install.cmake
 build
 app/SOPython
 sqlite_score/zest_score.sqlext
+sogrep-src/x64
+nodelucene/x64

@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "electron-packager": "5.2.0",
-    "electron-rebuild": "^1.1.1",
+    "electron-rebuild": "^1.1.2",
     "grunt": "0.4.5",
     "grunt-download-electron": "2.1.2",
     "moment": "2.11.1",

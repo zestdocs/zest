@@ -29,7 +29,7 @@
        (let [ret-data answer
              ret (async/chan)
              cStream (.createReadStream
-                       zest.core/so-db
+                       @zest.core/so-db
                        (js-obj "gt" (str "c_" (.-Id answer) "_")
                                "lt" (str "c_" (.-Id answer) "_a")))
 
@@ -39,7 +39,6 @@
 
              check-finished
              (fn []
-               (.log js/console @all @done)
                (if (and @ended (= @all @done)) (go (async/>! ret ret-data))))]
 
          (aset ret-data "comments" (array))
@@ -54,7 +53,7 @@
                 (let [comment (.parse js/JSON (.-value v))]
                   (.push (aget ret-data "comments") comment)
                   (if (and with-users (nil? (.-UserDisplayName comment)))
-                    (.get zest.core/so-db (str "u_" (.-UserId comment))
+                    (.get @zest.core/so-db (str "u_" (.-UserId comment))
                           (fn [e ret]
                             (.log js/console ret)
                             (aset comment "UserDisplayName"
@@ -73,7 +72,7 @@
      finished (atom 0)
      ended (atom false)
      cStream (.createReadStream
-               zest.core/so-db
+               @zest.core/so-db
                (js-obj "gt" (str "c_" (.-Id data) "_")
                        "lt" (str "c_" (.-Id data) "_a")))
      check-finished
@@ -93,7 +92,7 @@
     (.on cStream "end"
          (fn []
            (let [aStream (.createReadStream
-                           zest.core/so-db
+                           @zest.core/so-db
                            (js-obj "gt" (str "a_" (.-Id data) "_")
                                    "lt" (str "a_" (.-Id data) "_a")))]
              (.on aStream "data"

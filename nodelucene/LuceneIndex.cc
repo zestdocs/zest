@@ -3,6 +3,8 @@
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/filesystem.hpp>
 
+#define LPP_HAVE_DLL
+
 #include "LuceneIndex.h"
 #include "FileUtils.h"
 #include "FuzzyTermEnum.h"

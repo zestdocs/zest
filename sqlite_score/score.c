@@ -2,6 +2,7 @@
 #include <string.h>
 SQLITE_EXTENSION_INIT1
 
+
 // ported from DevDocs' searcher.coffee
 
 void match_fuzzy(
@@ -136,6 +137,9 @@ static void scoreFunc(
 }
 
 
+#ifdef _WIN32
+__declspec(dllexport)
+#endif
 int sqlite3_extension_init(
     sqlite3 *db,
     char **pzErrMsg,
