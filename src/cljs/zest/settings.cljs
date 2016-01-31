@@ -49,7 +49,9 @@
         (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
         idx (LuceneIndex. (.join path (zest.docs.registry/get-devdocs-root)
                                  "new_lucene"))
-        all-count (count @zest.docs.registry/installed-devdocs-atom)
+        docs-count (count @zest.docs.registry/installed-devdocs-atom)
+        all-count (if (> docs-count 0)
+                    (inc docs-count) 0)
         indexed-count (atom 0)
 
         check-done
@@ -59,15 +61,26 @@
             (do (reset! devdocs-reindexing false)
                 (.endWriting idx)
                 (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "lucene"))
+                (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols"))
                 (.move
                   fs
                   (.join path (zest.docs.registry/get-devdocs-root) "new_lucene")
                   (.join path (zest.docs.registry/get-devdocs-root) "lucene")
-                  (fn [])))
+                  (fn []))
+                (.move
+                  fs
+                  (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")
+                  (.join path (zest.docs.registry/get-devdocs-root) "symbols")
+                  (fn []
+                    (zest.core/open-symbol-db
+                      #(zest.docs.registry/update-installed-devdocs))))) ; update query results
             (reset! devdocs-reindexing-progress
                     (str @indexed-count "/" all-count))))]
     (if (> all-count 0)
       (do
+        (go
+          (async/<! (zest.core/rebuild-symbol-db))
+          (check-done))
         (.startWriting idx)
         (doall
           (for [docset @zest.docs.registry/installed-devdocs-atom]
@@ -233,6 +246,11 @@
               (.endWriting idx)
               (.sync rimraf (.join path (zest.docs.registry/get-so-root) "lucene"))
               (.sync rimraf (.join path (zest.docs.registry/get-so-root) "leveldb"))
+              (.move
+                fs
+                (.join path (zest.docs.registry/get-so-root) "new_index" "symbols")
+                (.join path (zest.docs.registry/get-so-root) "lucene")
+                (fn []))
               (.move
                 fs
                 (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
@@ -416,11 +434,11 @@
           [:b "DevDocs:"]
           (if @devdocs-reindexing
             [:span {:class "secondary-content"}
-             (str "Rebuilding index... " @devdocs-reindexing-progress)]
+             (str "Building index... " @devdocs-reindexing-progress)]
             [:a {:href     "#"
                  :class    "secondary-content"
                  :on-click #(devdocs-rebuild-index)}
-             "Rebuild FTS index"])]
+             "Build index"])]
          (doall (for [doc @installed-devdocs]
                   ^{:key (str "installeddoc_" doc)}
                   [:li {:class "collection-item"} doc

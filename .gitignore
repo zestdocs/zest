@@ -39,3 +39,4 @@ CMakeCache.txt
 cmake_install.cmake
 build
 app/SOPython
+sqlite_score/zest_score.sqlext
