@@ -55,12 +55,25 @@
     res))
 
 (def symbol-db (atom nil))
+
+(def app-dir
+  (let [path (.require js/window "path")]
+    (.join path
+      (.dirname path (.-__dirname js/window)))))
+
+(def extension-path
+  (let [path (.require js/window "path")]
+    (.join path
+       app-dir
+       "sqlite_score"
+       "zest_score.sqlext")))
+
 (defn open-symbol-db [cb] (let [path (.require js/window "path")
                                 sqlite3 (.require js/window "sqlite3")
                                 Database (.-Database sqlite3)
                                 db-path (.join path (zest.docs.registry/get-devdocs-root) "symbols")
                                 d (Database. db-path cb)]
-                            (.loadExtension d "sqlite_score/zest_score.sqlext"
+                            (.loadExtension d extension-path
                                             (fn [e] (.log js/console e)))
                             (reset! symbol-db d)))
 
@@ -75,7 +88,7 @@
         docs (atom @zest.docs.devdocs/entries)
         ret (async/chan)
         i (atom 0)]
-    (.loadExtension db "sqlite_score/zest_score.sqlext"
+    (.loadExtension db extension-path
                     (fn [e] (.log js/console e)))
     (.exec db "CREATE TABLE idx (ns, s, docset, path);  BEGIN;"
            (fn []
@@ -158,9 +171,12 @@
         (fn [data]
           (let [handlebars (.require js/window "handlebars")
                 fs (.require js/window "fs")
+                path (.require js/window "path")
                 tpl (.compile
                       handlebars
-                      (.readFileSync fs "app/templates/post.handlebars"
+                      (.readFileSync fs
+                                     (.join path
+                                       app-dir  "app/templates/post.handlebars")
                                      "utf8"))]
             (.registerHelper
               handlebars
@@ -171,7 +187,8 @@
             (.registerPartial
               handlebars
               "renderComments"
-              (.readFileSync fs "app/templates/comments.handlebars"
+              (.readFileSync fs (.join path
+                                       app-dir "app/templates/comments.handlebars")
                              "utf8"))
             (.log js/console data)
             (tpl (js-obj "post" data))))]
