@@ -4,7 +4,7 @@
 ;; HM NIS Edit Wizard helper defines
 !define PRODUCT_NAME "zest"
 ;; !define PRODUCT_VERSION "0.0"  ;; This is auto-defined by the caller in the release script
-!define PRODUCT_WEB_SITE "https://github.com/"
+!define PRODUCT_WEB_SITE "https://zestdocs.org/"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\zest.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
@@ -27,7 +27,7 @@
 ;; Start menu page
 var ICONS_GROUP
 !define MUI_STARTMENUPAGE_NODISABLE
-!define MUI_STARTMENUPAGE_DEFAULTFOLDER "Example"
+!define MUI_STARTMENUPAGE_DEFAULTFOLDER "Zest"
 !define MUI_STARTMENUPAGE_REGISTRY_ROOT "${PRODUCT_UNINST_ROOT_KEY}"
 !define MUI_STARTMENUPAGE_REGISTRY_KEY "${PRODUCT_UNINST_KEY}"
 !define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "${PRODUCT_STARTMENU_REGVAL}"
@@ -55,7 +55,7 @@ var ICONS_GROUP
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "${OUTFILE}"
-InstallDir "$PROGRAMFILES\Example"
+InstallDir "$PROGRAMFILES\Zest"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
 ShowUnInstDetails show

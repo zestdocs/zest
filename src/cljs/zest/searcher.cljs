@@ -10,9 +10,14 @@
   (let [child-process (.require js/window "child_process")
         last (atom "")
         ch (async/chan 100)
+        jspath (.require js/window "path")
         searcher (.spawn child-process
                          (zest.core/get-binary-path "searcher")
-                         (array path))]
+                         (array path)
+                         (js-obj
+                           "env" (js-obj
+                                   "PATH"
+                                   (.dirname jspath (.dirname jspath (.-__dirname js/window))))))]
     (reset! cur-searchers (assoc @cur-searchers path searcher))
     (reset! cur-searchers-lines (assoc @cur-searchers-lines path ch))
     (.on

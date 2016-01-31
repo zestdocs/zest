@@ -46,7 +46,7 @@
         rimraf (.require js/window "rimraf")
         fs (.require js/window "fs-extra")
         LuceneIndex
-        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
+        (.-LuceneIndex (.require js/window "nodelucene"))
         idx (let [new-lucene-path (.join path
                                          (zest.docs.registry/get-devdocs-root)
                                          "new_lucene")]
@@ -191,8 +191,14 @@
                  "archive" "stackexchange" (str "stackoverflow.com-Users.7z")))
         additional-args)
       (if (nil? pipe-stdout-to)
-        (js-obj)
         (js-obj
+          "env" (js-obj
+                  "PATH"
+                  (.dirname path (.dirname path (.-__dirname js/window)))))
+        (js-obj
+          "env" (js-obj
+                  "PATH"
+                  (.dirname path (.dirname path (.-__dirname js/window))))
           "stdio"
           (array "ignore" (.-stdin pipe-stdout-to) "ignore"))))))
 
@@ -223,7 +229,7 @@
                           "lt" "p_a"))
 
         LuceneIndex
-        (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
+        (.-LuceneIndex (.require js/window "nodelucene"))
         idx (LuceneIndex. (.join path (zest.docs.registry/get-so-root)
                                  "new_index" "lucene"))
 
@@ -305,7 +311,11 @@
               sogrep (.spawn child-process
                              (zest.core/get-binary-path "sogrep")
                              (apply array @so-index-tags)
-                             (js-obj "cwd"
+                             (js-obj
+                                 "env" (js-obj
+                                         "PATH"
+                                         (.dirname path (.dirname path (.-__dirname js/window))))
+                                 "cwd"
                                      (.join path
                                             (zest.docs.registry/get-so-root)
                                             "new_index")))

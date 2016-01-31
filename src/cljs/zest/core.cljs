@@ -191,7 +191,7 @@
      focus-id (reagent/atom nil)
 
      LuceneIndex
-     (.-LuceneIndex (.require js/window "../build/Release/nodelucene"))
+     (.-LuceneIndex (.require js/window "nodelucene"))
      path (.require js/window "path")
 
      get-search-index #(LuceneIndex.
