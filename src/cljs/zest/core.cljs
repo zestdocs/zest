@@ -319,7 +319,8 @@
                  (aset (.getElementById js/document "right") "className"
                        "")
                  (go (async-set-html (async/<! (render-so-post data)) #()))))))
-         (let [response (aget (aget zest.docs.devdocs/docset-db-cache docset)
+         (let [_docset  (zest.docs.devdocs/get-from-cache docset)   ;; stupid hack to populate db cache (FIXME)
+               response (aget (aget zest.docs.devdocs/docset-db-cache docset)
                               (nth (.split (.-path entry) "#") 0))]
            (let [new-hash (nth (.split (.-path entry) "#") 1)]
              (if (= @html response)
