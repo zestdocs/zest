@@ -327,13 +327,13 @@
                        (.spawn child-process
                                (zest.core/get-binary-path "sogrep")
                                (apply array @so-index-tags)
-                               "env" (js-obj
-                                       "PATH"
-                                       (.dirname path (.dirname path (.-__dirname js/window))))
-                               "cwd"
-                               (.join path
-                                      (zest.docs.registry/get-so-root)
-                                      "new_index")))
+                               (js-obj "env" (js-obj
+                                               "PATH"
+                                               (.dirname path (.dirname path (.-__dirname js/window))))
+                                       "cwd"
+                                       (.join path
+                                              (zest.docs.registry/get-so-root)
+                                              "new_index"))))
               extractor (if (= (.-platform js/process) "linux")
                           nil
                           (run-so-extractor (array)))]
