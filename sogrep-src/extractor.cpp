@@ -1,9 +1,12 @@
 #include <cstring>
 #include <iostream>
-#include <io.h>
 #include <archive.h>
 #include <archive_entry.h>
 
+#ifdef _WIN32
+#include <io.h>
+#define write _write
+#endif
 
 void print_size(char* filename) {
     archive *a = archive_read_new();
@@ -41,11 +44,12 @@ int main(int argc, char** argv) {
         print_size(argv[2]);
         std::cout << " ";
         print_size(argv[3]);
+        std::cout << std::endl;
     } else {
         extract(argv[1]); // Path to Posts.xml 7z file
-        _write(1, "\0", 1); // null separator, as expected in main.cpp
+        write(1, "\0", 1); // null separator, as expected in main.cpp
         extract(argv[2]); // Path to Comments.xml 7z file
-        _write(1, "\0", 1); // null separator, as expected in main.cpp
+        write(1, "\0", 1); // null separator, as expected in main.cpp
         extract(argv[3]); // Path to Users.xml 7z file
     }
 }

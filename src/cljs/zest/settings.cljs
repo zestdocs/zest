@@ -175,7 +175,7 @@
                  "")
                (reset! so-archives-available true)))))))
 
-(defn run-so-extractor [additional-args pipe-stdout-to]
+(defn run-so-extractor [additional-args]
   (let [child-process (.require js/window "child_process")
         path (.require js/window "path")]
     (.spawn
@@ -190,22 +190,15 @@
           (.join path (zest.docs.registry/get-so-root)
                  "archive" "stackexchange" (str "stackoverflow.com-Users.7z")))
         additional-args)
-      (if (nil? pipe-stdout-to)
-        (js-obj
-          "env" (js-obj
-                  "PATH"
-                  (.dirname path (.dirname path (.-__dirname js/window)))))
-        (js-obj
-          "env" (js-obj
-                  "PATH"
-                  (.dirname path (.dirname path (.-__dirname js/window))))
-          "stdio"
-          (array "ignore" (.-stdin pipe-stdout-to) "ignore"))))))
+      (js-obj
+        "env" (js-obj
+                "PATH"
+                (.dirname path (.dirname path (.-__dirname js/window))))))))
 
 (defn get-so-archive-sizes-sum []
   (let [ret (async/chan)
         ret-str (atom "")
-        process (run-so-extractor (array "sizes") nil)]
+        process (run-so-extractor (array "sizes"))]
     (.on (.-stdout process) "data"
          #(reset! ret-str (+ @ret-str (.toString % "utf8"))))
     (.on (.-stdout process) "end"
@@ -308,24 +301,51 @@
     (go (let [so-archives-total-val (async/<! (get-so-archive-sizes-sum))
               child-process (.require js/window "child_process")
               Lazy (.require js/window "lazy")
-              sogrep (.spawn child-process
-                             (zest.core/get-binary-path "sogrep")
-                             (apply array @so-index-tags)
-                             (js-obj
-                                 "env" (js-obj
-                                         "PATH"
-                                         (.dirname path (.dirname path (.-__dirname js/window))))
-                                 "cwd"
-                                     (.join path
-                                            (zest.docs.registry/get-so-root)
-                                            "new_index")))
-              extractor (run-so-extractor (array) nil)]
-          (.pipe (.-stdout extractor)
-                 (.-stdin sogrep))
+              sogrep (if (= (.-platform js/process) "linux")
+                       (let [shell-escape (js/require "shell-escape")]
+                         (.spawn child-process
+                                 "sh"
+                                 (array "-c"
+                                        (str (shell-escape
+                                               (array
+                                                 (zest.core/get-binary-path "extractor")
+                                                 (.join path (zest.docs.registry/get-so-root)
+                                                        "archive" "stackexchange" (str "stackoverflow.com-Posts.7z"))
+                                                 (.join path (zest.docs.registry/get-so-root)
+                                                        "archive" "stackexchange" (str "stackoverflow.com-Comments.7z"))
+                                                 (.join path (zest.docs.registry/get-so-root)
+                                                        "archive" "stackexchange" (str "stackoverflow.com-Users.7z"))))
+                                             " | "
+                                             (shell-escape
+                                               (.concat (array (zest.core/get-binary-path "sogrep"))
+                                                        (apply array @so-index-tags)))))
+                                 (js-obj
+                                   "cwd"
+                                   (.join path
+                                          (zest.docs.registry/get-so-root)
+                                          "new_index"))))
+                       (.spawn child-process
+                               (zest.core/get-binary-path "sogrep")
+                               (apply array @so-index-tags)
+                               "env" (js-obj
+                                       "PATH"
+                                       (.dirname path (.dirname path (.-__dirname js/window))))
+                               "cwd"
+                               (.join path
+                                      (zest.docs.registry/get-so-root)
+                                      "new_index")))
+              extractor (if (= (.-platform js/process) "linux")
+                          nil
+                          (run-so-extractor (array)))]
+          (if (not (nil? extractor))
+            (do
+              (.pipe (.-stdout extractor)
+                     (.-stdin sogrep))
+              (.on extractor "close" #(.end (.-stdin sogrep)))))
+
           (reset! so-archives-total so-archives-total-val)
           (reset! so-indexing true)
           (reset! so-grep-progress 0)
-          (.on extractor "close" #(.end (.-stdin sogrep)))
           (.on sogrep "close"
                (fn [code]
                  (.log js/console "sogrep exited with code" code)
