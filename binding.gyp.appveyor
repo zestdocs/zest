@@ -1,0 +1,39 @@
+{
+  "targets": [
+    {
+      "target_name": "nodelucene",
+      "sources": [ "nodelucene/LuceneIndex.cc" ],
+      "libraries": [
+        "c:\\zest_build\\LucenePlusPlus\\build\\src\\core\\Release\\lucene++.lib", "c:\\zest_build\\LucenePlusPlus\\build\\src\\contrib\\Release\\lucene++-contrib.lib",
+        "C:\\Libraries\\boost_1_59_0\\stage\\lib\\boost_filesystem-vc120-mt-1_59.lib",
+        "C:\\Libraries\\boost_1_59_0\\stage\\lib\\boost_system-vc120-mt-1_59.lib" ],
+      "xcode_settings": {
+        "OTHER_CFLAGS": [
+          "-std=c++11", "-stdlib=libc++", "-mmacosx-version-min=10.7", "-fexceptions"
+        ],
+      },
+      "cflags!": [ "-fno-exceptions" ],
+	  "defines!": ["_HAS_EXCEPTIONS=0"],
+    "defines": ["BOOST_ALL_NO_LIB"],
+	  'configurations': {
+        'Release': {
+          'msvs_settings': {
+            'VCCLCompilerTool': {
+              'ExceptionHandling': 1
+            },
+			'VCLinkerTool': {
+			  'AdditionalLibraryDirectories': 'C:\\Libraries\\boost_1_59_0\\stage\\lib'
+			}
+          }
+        }
+      },
+      "cflags_cc!": [ "-fno-exceptions" ],
+      "include_dirs": [
+        "c:\\zest_build\\LucenePlusPlus\\include",
+        "c:\\zest_build\\LucenePlusPlus\\src\\contrib\\include",
+		"c:\\zest_build\\LucenePlusPlus\\build\\include",
+		"C:\\Libraries\\boost_1_59_0"
+      ],
+    }
+  ]
+}

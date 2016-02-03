@@ -1,0 +1,51 @@
+cmake_minimum_required(VERSION 3.3)
+project(searcher)
+
+find_package(PkgConfig)
+find_package(
+        Boost COMPONENTS
+        date_time
+        filesystem
+        regex
+        system
+        thread
+        REQUIRED)
+set(Boost_USE_STATIC_LIBS OFF)
+if(MSVC)
+  # Disable automatic boost linking on Windows as libraries are added to the linker explicitly
+  add_definitions(-DBOOST_ALL_NO_LIB)
+endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+set(SOURCE_FILES searcher.cc)
+
+link_directories(
+	"C:\\Libraries\\boost_1_59_0\\stage\\lib"
+)
+add_executable(searcher ${SOURCE_FILES})
+target_link_libraries(
+        searcher
+        "c:\\zest_build\\LucenePlusPlus\\build\\src\\core\\Release\\lucene++.lib"
+	"c:\\zest_build\\LucenePlusPlus\\build\\src\\contrib\\Release\\lucene++-contrib.lib"
+        ${Boost_LIBRARIES}
+        ${Boost_FILESYSTEM_LIBRARIES}
+        "C:\\Libraries\\boost_1_59_0\\stage\\lib\\libboost_iostreams-vc120-mt-1_59.lib"
+        ${Boost_REGEX_LIBRARIES}
+        ${Boost_SYSTEM_LIBRARIES}
+        ${Boost_THREAD_LIBRARIES}
+)
+target_include_directories(
+        searcher
+        PUBLIC
+        "/usr/local/include/node"
+        "c:\\zest_build\\LucenePlusPlus\\include"
+        "c:\\zest_build\\LucenePlusPlus\\src\\contrib\\include"
+		"c:\\zest_build\\LucenePlusPlus\\build\\include"
+        ${Boost_INCLUDE_DIRS}
+)
+target_compile_options(
+        searcher
+        PUBLIC
+        ${LUCENE_CFLAGS_OTHER}
+        ${LUCENE_CONTRIB_CFLAGS_OTHER}
+)

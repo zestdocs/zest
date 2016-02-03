@@ -1,7 +1,7 @@
 
 # zest
 
-Early Proof of Concept prototype. It's my first ClojureScript project ever, I haven't decided about the license, etc. Not really meant for release, published mostly in case someone wants to collaborate.
+Early Proof of Concept prototype. It's my first ClojureScript project ever, etc. Not really meant for release, published mostly in case someone wants to collaborate.
 
 ## Requirements
 

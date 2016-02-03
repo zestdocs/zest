@@ -1,0 +1,47 @@
+cmake_minimum_required(VERSION 3.3)
+project(sogrep)
+
+find_package(PkgConfig)
+
+link_directories(
+        "/usr/local/lib"
+        "C:\\zest_build\\libarchive\\zest_build\\libarchive\\Release"
+        "C:\\zest_build\\xercesc.3.1.1\\build\\native\\lib\\x64\\v110\\Release"
+)
+add_executable(sogrep
+	main.cpp
+	"c:/zest_build/LevelDB.1.16.0.5/lib/native/src/leveldb-single-file.cpp"
+)
+add_executable(extractor extractor.cpp)
+target_link_libraries(
+        sogrep
+        "xerces-c_3.lib"
+		"Shlwapi.lib"
+)
+target_include_directories(
+        sogrep
+        PUBLIC
+        "C:\\zest_build\\xercesc.3.1.1\\build\\native\\include"
+		"C:\\zest_build\\rapidjson.1.0.2\\build\\native\\include"
+		"C:\\zest_build\\LevelDB.1.16.0.5\\lib\\native\\include"
+		"C:\\zest_build\\LevelDB.1.16.0.5\\lib\\native\\src"
+		"C:\\zest_build\\LevelDB.1.16.0.5\\lib\\native\\src\\port\\win"
+)
+target_compile_options(
+        sogrep
+        PUBLIC
+)
+
+target_link_libraries(
+        extractor
+        "C:\\zest_build\\libarchive\\zest_build\\libarchive\\Release\\archive.lib"
+)
+target_include_directories(
+        extractor
+        PUBLIC
+        "C:\\zest_build\\libarchive\\libarchive"
+)
+target_compile_options(
+        extractor
+        PUBLIC
+)
