@@ -304,7 +304,7 @@ grunt.registerTask('release-win', function() {
         grunt.log.writeln("\nSkipping windows installer creation:", "makensis not installed or not in path".cyan);
     }
   };
-  cb('builds/zest-v0.1.0-alpha1-pre/zest-win32-x64');
+  cb('builds/zest-v0.1.0-alpha2-pre/zest-win32-x64');
   done();
 });
 grunt.registerTask('prepare-win', function() {
