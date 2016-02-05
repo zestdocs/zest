@@ -32,6 +32,12 @@
         (.existsSync fs done-filename)
         (.isFile (.statSync fs done-filename))))))
 
+(defn async-rimraf [path]
+  (let [res (async/chan)
+        rimraf (js/require "rimraf")]
+    (go (rimraf path #(go (async/>! res (or % true)))))
+    res))
+
 (defn async-add-file [idx name contents]
   (let [ret (async/chan)]
     (.setImmediate
@@ -43,15 +49,15 @@
   (reset! devdocs-reindexing true)
   (reset! devdocs-reindexing-progress "")
   (let [path (.require js/window "path")
-        rimraf (.require js/window "rimraf")
         fs (.require js/window "fs-extra")
         LuceneIndex
         (.-LuceneIndex (.require js/window "nodelucene"))
-        idx (let [new-lucene-path (.join path
-                                         (zest.docs.registry/get-devdocs-root)
-                                         "new_lucene")]
-              (.sync rimraf new-lucene-path)
-              (LuceneIndex. new-lucene-path))
+        idx-chan (let [new-lucene-path (.join path
+                                              (zest.docs.registry/get-devdocs-root)
+                                              "new_lucene")]
+                   (go (async/<! (async-rimraf new-lucene-path))
+                       (LuceneIndex. new-lucene-path)))
+        idx (atom nil)
         docs-count (count @zest.docs.registry/installed-devdocs-atom)
         all-count (if (> docs-count 0)
                     (inc docs-count) 0)
@@ -61,9 +67,9 @@
         (fn []
           (reset! indexed-count (inc @indexed-count))
           (if (= @indexed-count all-count)
-            (do (reset! devdocs-reindexing false)
-                (.endWriting idx)
-                (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "lucene"))
+            (go (reset! devdocs-reindexing false)
+                (.endWriting @idx)
+                (async/<! (async-rimraf (.join path (zest.docs.registry/get-devdocs-root) "lucene")))
                 (.move
                   fs
                   (.join path (zest.docs.registry/get-devdocs-root) "new_lucene")
@@ -71,40 +77,42 @@
                   (fn []))
                 (.close
                   @zest.core/symbol-db
-                  (fn []
-                    (.sync rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols"))
+                  (fn [] (go
+                    (async/<! (async-rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols")))
                     (.move
                       fs
                       (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")
                       (.join path (zest.docs.registry/get-devdocs-root) "symbols")
                       (fn []
-                        (zest.core/open-symbol-db
-                          #(zest.docs.registry/update-installed-devdocs))))))) ; update query results
+                        (zest.core/open-symbol-db  ; update query results
+                          #(zest.docs.registry/update-installed-devdocs))))))))
             (reset! devdocs-reindexing-progress
                     (str @indexed-count "/" all-count))))]
     (if (> all-count 0)
-      (do
+      (do                                                   ; rebuild sqlite and lucene indices in parallel
         (go
           (async/<! (zest.core/rebuild-symbol-db))
           (check-done))
-        (.startWriting idx)
-        (doall
-          (for [docset @zest.docs.registry/installed-devdocs-atom]
-            (do
-              (zest.docs.devdocs/get-from-cache docset)
-              (let [db-cache (aget zest.docs.devdocs/docset-db-cache docset)
-                    keys (.keys js/Object db-cache)
-                    i (atom 0)]
-                (go-loop []
-                         (if (< @i (.-length keys))
-                           (do (async/<! (async-add-file
-                                           idx
-                                           (str docset "/" (nth keys @i))
-                                           (zest.docs.stackoverflow/unfluff
-                                             (aget db-cache (nth keys @i)))))
-                               (reset! i (inc @i))
-                               (recur))
-                           (check-done))))))))
+        (go
+          (reset! idx (async/<! idx-chan))
+          (.startWriting @idx)
+          (doall
+            (for [docset @zest.docs.registry/installed-devdocs-atom]
+              (do
+                (zest.docs.devdocs/get-from-cache docset)
+                (let [db-cache (aget zest.docs.devdocs/docset-db-cache docset)
+                      keys (.keys js/Object db-cache)
+                      i (atom 0)]
+                  (go-loop []
+                           (if (< @i (.-length keys))
+                             (do (async/<! (async-add-file
+                                             @idx
+                                             (str docset "/" (nth keys @i))
+                                             (zest.docs.stackoverflow/unfluff
+                                               (aget db-cache (nth keys @i)))))
+                                 (reset! i (inc @i))
+                                 (recur))
+                             (check-done)))))))))
       (reset! devdocs-reindexing false))))
 
 
@@ -252,26 +260,23 @@
               (zest.searcher/stop-all-searchers)
               (.close
                 @zest.core/so-db
-                (fn []
-                  (reset! zest.core/so-db db)
-                  (.sync rimraf (.join path (zest.docs.registry/get-so-root) "lucene"))
-                  (.sync rimraf (.join path (zest.docs.registry/get-so-root) "leveldb"))
-                  (.move
-                    fs
-                    (.join path (zest.docs.registry/get-so-root) "new_index" "symbols")
-                    (.join path (zest.docs.registry/get-so-root) "lucene")
-                    (fn []))
-                  (.move
-                    fs
-                    (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
-                    (.join path (zest.docs.registry/get-so-root) "lucene")
-                    (fn []))
-                  (.move
-                    fs
-                    (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
-                    (.join path (zest.docs.registry/get-so-root) "leveldb")
-                    (fn []))
-                  (reset! so-indexing false))))))]
+                (.close
+                  db
+                  #(go
+                    (async/<! (async-rimraf (.join path (zest.docs.registry/get-so-root) "lucene")))
+                    (async/<! (async-rimraf (.join path (zest.docs.registry/get-so-root) "leveldb")))
+                    (.move
+                      fs
+                      (.join path (zest.docs.registry/get-so-root) "new_index" "lucene")
+                      (.join path (zest.docs.registry/get-so-root) "lucene")
+                      (fn []))
+                    (.move
+                      fs
+                      (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb")
+                      (.join path (zest.docs.registry/get-so-root) "leveldb")
+                      (fn []
+                        (zest.core/set-so-db)
+                        (reset! so-indexing false)))))))))]
     (.startWriting idx)
     (.on rStream "data"
          (fn [v]
@@ -294,49 +299,49 @@
 
 (defn start-so-grepping []
   (let [mkdirp (.require js/window "mkdirp")
-        rimraf (.require js/window "rimraf")
         path (.require js/window "path")]
-    (.sync rimraf (.join path (zest.docs.registry/get-so-root) "new_index"))
-    (.sync mkdirp (.join path (zest.docs.registry/get-so-root) "new_index"))
-    (go (let [so-archives-total-val (async/<! (get-so-archive-sizes-sum))
-              child-process (.require js/window "child_process")
-              Lazy (.require js/window "lazy")
-              sogrep (if (= (.-platform js/process) "linux")
-                       (let [shell-escape (js/require "shell-escape")]
-                         (.spawn child-process
-                                 "sh"
-                                 (array "-c"
-                                        (str (shell-escape
-                                               (array
-                                                 (zest.core/get-binary-path "extractor")
-                                                 (.join path (zest.docs.registry/get-so-root)
-                                                        "archive" "stackexchange" (str "stackoverflow.com-Posts.7z"))
-                                                 (.join path (zest.docs.registry/get-so-root)
-                                                        "archive" "stackexchange" (str "stackoverflow.com-Comments.7z"))
-                                                 (.join path (zest.docs.registry/get-so-root)
-                                                        "archive" "stackexchange" (str "stackoverflow.com-Users.7z"))))
-                                             " | "
-                                             (shell-escape
-                                               (.concat (array (zest.core/get-binary-path "sogrep"))
-                                                        (apply array @so-index-tags)))))
-                                 (js-obj
-                                   "cwd"
-                                   (.join path
-                                          (zest.docs.registry/get-so-root)
-                                          "new_index"))))
+    (go
+      (async/<! (async-rimraf (.join path (zest.docs.registry/get-so-root) "new_index")))
+      (.sync mkdirp (.join path (zest.docs.registry/get-so-root) "new_index"))
+      (let [so-archives-total-val (async/<! (get-so-archive-sizes-sum))
+            child-process (.require js/window "child_process")
+            Lazy (.require js/window "lazy")
+            sogrep (if (= (.-platform js/process) "linux")
+                     (let [shell-escape (js/require "shell-escape")]
                        (.spawn child-process
-                               (zest.core/get-binary-path "sogrep")
-                               (apply array @so-index-tags)
-                               (js-obj "env" (js-obj
-                                               "PATH"
-                                               (.dirname path (.dirname path (.-__dirname js/window))))
-                                       "cwd"
-                                       (.join path
-                                              (zest.docs.registry/get-so-root)
-                                              "new_index"))))
-              extractor (if (= (.-platform js/process) "linux")
-                          nil
-                          (run-so-extractor (array)))]
+                               "sh"
+                               (array "-c"
+                                      (str (shell-escape
+                                             (array
+                                               (zest.core/get-binary-path "extractor")
+                                               (.join path (zest.docs.registry/get-so-root)
+                                                      "archive" "stackexchange" (str "stackoverflow.com-Posts.7z"))
+                                               (.join path (zest.docs.registry/get-so-root)
+                                                      "archive" "stackexchange" (str "stackoverflow.com-Comments.7z"))
+                                               (.join path (zest.docs.registry/get-so-root)
+                                                      "archive" "stackexchange" (str "stackoverflow.com-Users.7z"))))
+                                           " | "
+                                           (shell-escape
+                                             (.concat (array (zest.core/get-binary-path "sogrep"))
+                                                      (apply array @so-index-tags)))))
+                               (js-obj
+                                 "cwd"
+                                 (.join path
+                                        (zest.docs.registry/get-so-root)
+                                        "new_index"))))
+                     (.spawn child-process
+                             (zest.core/get-binary-path "sogrep")
+                             (apply array @so-index-tags)
+                             (js-obj "env" (js-obj
+                                             "PATH"
+                                             (.dirname path (.dirname path (.-__dirname js/window))))
+                                     "cwd"
+                                     (.join path
+                                            (zest.docs.registry/get-so-root)
+                                            "new_index"))))
+            extractor (if (= (.-platform js/process) "linux")
+                        nil
+                        (run-so-extractor (array)))]
           (if (not (nil? extractor))
             (do
               (.pipe (.-stdout extractor)

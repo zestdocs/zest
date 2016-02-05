@@ -16,12 +16,16 @@
         path (.require js/window "path")]
     (.join path (.dirname path dir) filename)))
 
-(def so-db
-  (atom
+(def so-db (atom nil))
+
+(defn set-so-db []
+  (reset! so-db
     (let [levelup (.require js/window "levelup")
-          path (.require js/window "path")]
-      (levelup (.join path (zest.docs.registry/get-so-root)
-                      "leveldb")))))
+            path (.require js/window "path")]
+        (levelup (.join path (zest.docs.registry/get-so-root)
+                        "leveldb")))))
+
+(set-so-db)
 
 (def so-index
   (let
@@ -81,34 +85,36 @@
   (let [sqlite3 (.require js/window "sqlite3")
         Database (.-Database sqlite3)
         path (.require js/window "path")
-        rimraf (.require js/window "rimraf")
-        db (let [db-path (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")]
-             (.sync rimraf db-path)
-             (Database. db-path))
+        db-chan (let [db-path (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")]
+             (go (async/<! (zest.settings/async-rimraf db-path))
+                 (Database. db-path)))
+        db (atom nil)
         docs (atom @zest.docs.devdocs/entries)
         ret (async/chan)
         i (atom 0)]
-    (.loadExtension db extension-path
-                    (fn [e] (.log js/console e)))
-    (.exec db "CREATE TABLE idx (ns, s, docset, path);  BEGIN;"
-           (fn []
-             (let [prep (.prepare db "INSERT INTO idx VALUES (?, ?, ?, ?)")]
-               (go-loop
-                 []
-                 (if (empty? @docs)
-                   (do
-                     (.finalize prep)
-                     (.run db "COMMIT"
-                           (fn [] (.close db #(go (async/>! ret true))))))
-                   (do
-                     (if (= (mod @i 1000) 999)
-                       (.log js/console (inc @i)))
-                     (reset! i (inc @i))
-
-                     (async/<! (insert-doc prep (first @docs)))
-                     (reset! docs (rest @docs))
-                     (recur)))))))
-    ret))
+    (go
+      (reset! db (async/<! db-chan))
+      (.loadExtension @db extension-path
+                      (fn [e] (.log js/console e)))
+      (.exec @db "CREATE TABLE idx (ns, s, docset, path);  BEGIN;"
+             (fn []
+               (let [prep (.prepare @db "INSERT INTO idx VALUES (?, ?, ?, ?)")]
+                 (go-loop
+                   []
+                   (if (empty? @docs)
+                     (do
+                       (.finalize prep)
+                       (.run @db "COMMIT"
+                             (fn [] (.close @db #(go (async/>! ret true))))))
+                     (do
+                       (if (= (mod @i 1000) 999)
+                         (.log js/console (inc @i)))
+                       (reset! i (inc @i))
+  
+                       (async/<! (insert-doc prep (first @docs)))
+                       (reset! docs (rest @docs))
+                       (recur))))))))
+      ret))
 
 
 (def query (reagent/atom ""))
