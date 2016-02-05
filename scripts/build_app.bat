@@ -26,6 +26,9 @@ copy sqlite_score\zest_score.sqlext builds\zest-v0.1.0-alpha2-pre\zest-win32-x64
 copy sogrep-src\Release\*.exe builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources
 copy nodelucene\Release\searcher.exe builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources
 
+mkdir builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources\app\templates
+copy app\templates\* builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources\app\templates
+
 copy "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\redist\x64\Microsoft.VC110.CRT\msvcr110.dll" builds\zest-v0.1.0-alpha2-pre\zest-win32-x64
 copy "LucenePlusPlus\build\src\core\Release\lucene++.dll" builds\zest-v0.1.0-alpha2-pre\zest-win32-x64
 copy "LucenePlusPlus\build\src\contrib\Release\lucene++-contrib.dll" builds\zest-v0.1.0-alpha2-pre\zest-win32-x64

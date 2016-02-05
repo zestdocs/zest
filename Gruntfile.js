@@ -159,7 +159,7 @@ function getReleasePaths(build) {
 function getBasicReleaseInfo(build, paths) {
   var opts = {
     "dir": paths.releaseApp,
-    "name": packageJson.name,
+    "name": 'Zest',
     "version": electron_version,
     "asar": true,
     "out": paths.release,
@@ -218,7 +218,7 @@ function deleteExtraResources(paths) {
 // Tasks
 //------------------------------------------------------------------------------
 
-grunt.registerTask('release', ['cljsbuild-prod', 'prepare-release', 'release-linux']);
+grunt.registerTask('release', ['cljsbuild-prod', 'prepare-release', 'release-mac']);
 
 grunt.registerTask('cljsbuild-prod', function() {
   grunt.log.writeln("\nCleaning and building ClojureScript production files...");
@@ -254,6 +254,8 @@ grunt.registerTask('prepare-release', function() {
   exec('npm install --no-optional --production --silent');
   popd();
   cp('-f', paths.devPkg, paths.releaseApp);
+  cp('-f', 'node_modules/nodelucene.node', paths.releaseApp+'/node_modules');
+  cp('-r', 'node_modules/sqlite3', paths.releaseApp+'/node_modules');
 
   deleteExtraResources(paths);
   stampRelease(build, paths);
@@ -326,7 +328,7 @@ grunt.registerTask('release-mac', function() {
       var dmgName = path.join(dirName, path.basename(dirName) + ".dmg");
       grunt.config.set("appdmg", {
         options: {
-          "title": "zest",
+          "title": "Zest",
           "background": "scripts/dmg/TestBkg.png",
           "icon-size": 80,
           "contents": [
