@@ -156,7 +156,7 @@ function getReleasePaths(build) {
   return paths;
 }
 
-function getBasicReleaseInfo(build, paths) {
+function getBasicReleaseInfo(build, paths, platform) {
   var opts = {
     "dir": paths.releaseApp,
     "name": packageJson.name,
@@ -164,13 +164,16 @@ function getBasicReleaseInfo(build, paths) {
     "asar": true,
     "out": paths.release,
     "overwrite": true,
-    "app-bundle-id": "com.example",
+    "app-bundle-id": "org.zestdocs",
     "app-version": build.version,
     "version-string": {
       "ProductVersion": build.version,
       "ProductName": packageJson.name,
     }
   };
+  if (platform == 'darwin' || platform == 'mas') {
+    opts.name = opts.name.charAt(0).toUpperCase() + opts.name.slice(1);
+  }
   return opts;
 }
 
@@ -187,7 +190,7 @@ function defineRelease(done, extra_opts, cb) {
   var callback = cb || (function () {});
   var build = getBuildMeta();
   var paths = getReleasePaths(build);
-  var basic_opts = getBasicReleaseInfo(build, paths);
+  var basic_opts = getBasicReleaseInfo(build, paths, extra_opts.platform);
   var opts = Object.assign(basic_opts, extra_opts);
 
   packager(opts, function(err, appPath) {
