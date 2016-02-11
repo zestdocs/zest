@@ -49,7 +49,10 @@ a:hover {
 
 /* split.js */
 .split, .gutter.gutter-horizontal, #left, #right {
+  height: 100%;
   float: left;
+}
+#right-contents {
   height: 100%;
 }
 
@@ -71,9 +74,27 @@ a:hover {
   margin-left: 1rem;
 }
 
-#right {
-  overflow: auto;
-  padding: 0 3rem;
+
+#right .pageSearchInput {
+    height: 3rem;
+    padding-bottom: 2px;
+    padding-left: 1rem;
+    box-sizing: content-box;
+    position: fixed;
+    right:0;
+    z-index: 10000;
+}
+#right .pageSearchInput a {
+    width: 36px;
+    padding: 0;
+}
+#right .pageSearchInput input {
+    margin: 0 1rem;
+    width: 200px;
+}
+#right .pageSearchInput * {
+    display: inline-block;
+    width: auto;
 }
 
 .gutter {

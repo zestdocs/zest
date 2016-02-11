@@ -20,10 +20,10 @@
 
 (defn set-so-db []
   (reset! so-db
-    (let [levelup (.require js/window "levelup")
-            path (.require js/window "path")]
-        (levelup (.join path (zest.docs.registry/get-so-root)
-                        "leveldb")))))
+          (let [levelup (.require js/window "levelup")
+                path (.require js/window "path")]
+            (levelup (.join path (zest.docs.registry/get-so-root)
+                            "leveldb")))))
 
 (set-so-db)
 
@@ -63,14 +63,14 @@
 (def app-dir
   (let [path (.require js/window "path")]
     (.join path
-      (.dirname path (.-__dirname js/window)))))
+           (.dirname path (.-__dirname js/window)))))
 
 (def extension-path
   (let [path (.require js/window "path")]
     (.join path
-       app-dir
-       "sqlite_score"
-       "zest_score.sqlext")))
+           app-dir
+           "sqlite_score"
+           "zest_score.sqlext")))
 
 (defn open-symbol-db [cb] (let [path (.require js/window "path")
                                 sqlite3 (.require js/window "sqlite3")
@@ -86,8 +86,8 @@
         Database (.-Database sqlite3)
         path (.require js/window "path")
         db-chan (let [db-path (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")]
-             (go (async/<! (zest.settings/async-rimraf db-path))
-                 (Database. db-path)))
+                  (go (async/<! (zest.settings/async-rimraf db-path))
+                      (Database. db-path)))
         db (atom nil)
         docs (atom @zest.docs.devdocs/entries)
         ret (async/chan)
@@ -110,11 +110,11 @@
                        (if (= (mod @i 1000) 999)
                          (.log js/console (inc @i)))
                        (reset! i (inc @i))
-  
+
                        (async/<! (insert-doc prep (first @docs)))
                        (reset! docs (rest @docs))
                        (recur))))))))
-      ret))
+    ret))
 
 
 (def query (reagent/atom ""))
@@ -182,7 +182,7 @@
                       handlebars
                       (.readFileSync fs
                                      (.join path
-                                       app-dir  "app/templates/post.handlebars")
+                                            app-dir "app/templates/post.handlebars")
                                      "utf8"))]
             (.registerHelper
               handlebars
@@ -238,7 +238,7 @@
                   res
                   (str
                     @res
-                    "<h5><a href='javascript:openDoc(\""
+                    "<h5><a href='javascript:ipcRenderer.sendToHost(\"openDoc\",\""
                     docset "\", \"" path "\""
                     ")'>"
                     (nth files @i)
@@ -260,72 +260,79 @@
        (if focus-id (.clearTimeout js/window @focus-id))
        (reset! focus-id (.setTimeout js/window #(reset! input-focus false) 600)))
      hash (reagent/atom "#")
-     right-class (reagent/create-class
-                   {:component-did-mount
-                    (fn []
-                      (splitjs
-                        (array "#left", "#right")
-                        (js-obj
-                          "sizes" (array 25 75))))
-
-
-                    :reagent-render
-                    (fn []
-                      [:div
-                       {:id "right"}])})
+     set-hash
+     (fn [new-hash]
+       (if (nil? new-hash)
+         (set! (.-scrollTop (.getElementById js/document "right-contents")) 0)
+         (.setImmediate
+           js/window
+           (fn []
+             ; in case new-hash = current hash:
+             (.send (.getElementById js/document "right-contents") "hash" "")
+             (.setImmediate
+               js/window
+               #(.send (.getElementById js/document "right-contents") "hash" new-hash))))))
 
      async-num (atom 0)
      async-set-html
-     (fn [new-html done-cb]
+     (fn [new-class new-html done-cb]
        (let
-         [target (.getElementById js/document "right")
+         [target (.getElementById js/document "right-contents")
           temp (atom (.createElement js/document "div"))
-          frag (.createDocumentFragment js/document)
           cur-num (+ @async-num 1)
+
+          attrs-to-array
+          (fn [attrs]
+            (if attrs
+              (.map
+                (apply array (range (.-length attrs)))
+                #(js-obj
+                  "name" (.-name (aget attrs %))
+                  "value" (.-value (aget attrs %))))
+              attrs))
 
           proceed
           (fn proceed []
             (if (= cur-num @async-num)
               (if (.-firstChild @temp)
-                (do (.appendChild frag (.-firstChild @temp))
-                    (.setImmediate js/window proceed))
-                (do (set! (.-innerHTML target) "")
-                    (.appendChild target frag)
-                    (done-cb)))))]
+                (let [first (.-firstChild @temp)]
+                  (if (or (= (.-nodeType first) 1)
+                          (= (.-nodeType first) 3))
+                    (.send target "add"
+                           (if (= (.-nodeType first) 1)
+                             (.-tagName first)
+                             (.-nodeType first))
+                           (if (= (.-nodeType first) 1)
+                             (.-innerHTML first)
+                             (.-data first))
+                           (attrs-to-array (.-attributes first))))
+                  (.removeChild @temp first)
+                  (.setImmediate js/window proceed))
+                (done-cb))))]
 
          (reset! async-num (+ @async-num 1))
          (reset! html new-html)
          (set! (.-innerHTML @temp) new-html)
+         (.send target "reset" new-class)
          (proceed)))
-
-     set-hash
-     (fn [new-hash]
-       (if (nil? new-hash)
-         (set! (.-scrollTop (.getElementById js/document "right")) 0)
-         (.setImmediate
-           js/window
-           (fn []
-             ; in case new-hash = current hash:
-             (set! (.-hash js/location) "")
-             (.setImmediate
-               js/window
-               #(set! (.-hash js/location) new-hash))))))
 
      activate-item
      (fn [docset entry]
        (.log js/console docset entry)
        (if (= 0 (.indexOf docset "stackoverflow"))
          (let []
-           (set! (.-scrollTop (.getElementById js/document "right")) 0)
+           (set! (.-scrollTop (.getElementById js/document "right-contents")) 0)
            (.get
              @so-db
              (str "p_" entry)
              (fn [e json]
                (let [data (.parse js/JSON json)]
-                 (aset (.getElementById js/document "right") "className"
+                 (aset (.getElementById js/document "right-contents") "className"
                        "")
-                 (go (async-set-html (async/<! (render-so-post data)) #()))))))
-         (let [_docset  (zest.docs.devdocs/get-from-cache docset)   ;; stupid hack to populate db cache (FIXME)
+                 (go (async-set-html
+                       ""
+                       (async/<! (render-so-post data)) #()))))))
+         (let [_docset (zest.docs.devdocs/get-from-cache docset) ;; stupid hack to populate db cache (FIXME)
                response (aget (aget zest.docs.devdocs/docset-db-cache docset)
                               (nth (.split (.-path entry) "#") 0))]
            (let [new-hash (nth (.split (.-path entry) "#") 1)]
@@ -336,10 +343,84 @@
 
                (do
                  (reset! hash new-hash)
-                 (aset (.getElementById js/document "right") "className"
+                 (aset (.getElementById js/document "right-contents") "className"
                        (str "_" (nth (.split docset "~") 0)))
-                 (async-set-html response #(set-hash new-hash))
+                 (async-set-html (str "_" (nth (.split docset "~") 0))
+                                 response #(set-hash new-hash))
                  (set-600ms-focus)))))))
+
+     right-class
+     (let [get-contents #(.getElementById js/document "right-contents")
+           get-search-input #(.getElementById js/document "pageSearchInputControl")
+           search-visible (reagent/atom false)]
+       (set!
+         (.-showFind js/window)
+         (fn []
+           (reset! search-visible true)
+           (js/setImmediate #(.focus (get-search-input)))))
+       (reagent/create-class
+         {:component-did-mount
+          (fn []
+            (.addEventListener
+              (get-contents)
+              "ipc-message"
+              (fn [event]
+                (if (= (.-channel event) "openDoc")
+                  (activate-item (aget (.-args event) 0)
+                                 (js-obj "path" (aget (.-args event) 1))))))
+            (splitjs
+              (array "#left", "#right")
+              (js-obj
+                "sizes" (array 25 75))))
+
+
+          :reagent-render
+          (fn []
+            [:div {:id "right"}
+             (if @search-visible
+               (do
+                 (js/setImmediate #(.focus (get-search-input)))
+                 [:div
+                  {:class "pageSearchInput teal lighten-3"}
+                  "Find:"
+                  [:input
+                   {:id   "pageSearchInputControl"
+                    :type "text"
+                    :on-key-down
+                          (fn [e]
+                            (case (.-key e)
+                              "ArrowDown" (reset! index (mod (+ @index 1) (count @results)))
+                              "ArrowUp" (reset! index (mod (- @index 1) (count @results)))
+                              "Escape"
+                              (if (= "" (.-value (.-target e)))
+                                (reset! search-visible false)
+                                (do (set! (.-value (.-target e)) "")
+                                    (set-query "")))
+                              "Enter" (.findInPage (get-contents)
+                                                   (.-value (get-search-input))))
+                            false)
+
+                    :on-change
+                          (fn [e]
+                            (let [q (-> e .-target .-value)]
+                              (.findInPage (get-contents) q)))}]
+                  [:a {:class "btn-flat"}
+                   [:i {:class    "material-icons"
+                        :on-click #(.findInPage (get-contents)
+                                                (.-value (get-search-input))
+                                                (js-obj "forward" false))}
+                    "skip_previous"]]
+                  [:a {:class "btn-flat"}
+                   [:i {:class    "material-icons"
+                        :on-click #(.findInPage (get-contents)
+                                                (.-value (get-search-input)))}
+                    "skip_next"]]]))
+             [:webview
+              {:id      "right-contents"
+               :src     (.join path
+                               app-dir "app/viewer.html")
+               :preload (.join path
+                               app-dir "app/viewer.js")}]])}))
 
      refresh
      (fn []
@@ -348,9 +429,10 @@
          (if (= "__FTS__" entry-path)
            (fts-results (.search (get-search-index) @query)
                         #(async-set-html
+                          ""
                           %
                           (fn [] (set! (.-scrollTop
-                                         (.getElementById js/document "right")) 0))))
+                                         (.getElementById js/document "right-contents")) 0))))
            (activate-item (.-docset entry) (.-contents entry)))))
 
      render-item
@@ -391,19 +473,15 @@
                [:strong "Stack Overflow"]]
               (map
                 (fn [res]
-                ^{:key (js/btoa (js/unescape (js/encodeURIComponent res)))}
-                [:a
-                 {:href     "#"
-                  :class    "collection-item"
-                  :on-click #(activate-item "stackoverflow"
-                                            (nth (.split res ";") 0))}
-                 (nth (.split res ";") 1)])
+                  ^{:key (js/btoa (js/unescape (js/encodeURIComponent res)))}
+                  [:a
+                   {:href     "#"
+                    :class    "collection-item"
+                    :on-click #(activate-item "stackoverflow"
+                                              (nth (.split res ";") 0))}
+                   (nth (.split res ";") 1)])
                 @search-results)])
          [:div]))]
-
-    (set! (.-openDoc js/window)
-          (fn [docset item]
-            (activate-item docset (js-obj "path" item))))
 
     (reagent/create-class
       {:reagent-render
