@@ -29,6 +29,7 @@ copy nodelucene\Release\searcher.exe builds\zest-v0.1.0-alpha2-pre\zest-win32-x6
 mkdir builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources\app\templates
 copy app\templates\* builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources\app\templates
 copy app\viewer.* builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources\app
+copy app\sotags.json builds\zest-v0.1.0-alpha2-pre\zest-win32-x64\resources\app
 
 copy "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\redist\x64\Microsoft.VC110.CRT\msvcr110.dll" builds\zest-v0.1.0-alpha2-pre\zest-win32-x64
 copy "LucenePlusPlus\build\src\core\Release\lucene++.dll" builds\zest-v0.1.0-alpha2-pre\zest-win32-x64

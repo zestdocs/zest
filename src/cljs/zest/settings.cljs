@@ -136,6 +136,15 @@
    "objective-c"
    "clojure"])
 
+(defn top-tags []
+  (let [fs (.require js/window "fs")
+        path (.require js/window "path")
+        filename (.join path zest.core/app-dir
+                        "app" "sotags.json")]
+    (.parse js/JSON (.readFileSync fs filename "utf8"))))
+
+(def user-tags (reagent/atom []))
+
 (defn start-so-download []
   (let [WebTorrent (.require js/window "webtorrent")
         fs (.require js/window "fs")
@@ -364,60 +373,92 @@
                               js/window
                               (.toString line "utf8")))))))))
 
-(defn so-widget []
-  (if @so-archives-available
-    [:div
-     [:ul {:class "collection with-header"}
-      [:li {:class "collection-header"}
-       "Suggested tags (select ones you want in your index):"]
-      (doall (for [tag suggested-tags]
-               (do ^{:key (str "so_tags_" tag)}
-                   [:li {:class "collection-item"}
-                    [:input {:type     "checkbox"
-                             :id       (str "so_tag_cb_" tag)
-                             :checked  (get @so-index-tags tag)
-                             :disabled @so-indexing
-                             :on-change
-                                       (fn []
-                                         (if (nil? (get @so-index-tags tag))
-                                           (reset! so-index-tags
-                                                   (conj @so-index-tags tag))
-                                           (reset! so-index-tags
-                                                   (disj @so-index-tags tag))))}]
-                    [:label {:for   (str "so_tag_cb_" tag)
-                             :class "checkable"} tag]]
-                   )))]
-     (if @so-indexing
-       [:p (str
-             "Indexing: "
-             (.toFixed (* 100 (/ (or @so-grep-progress 0)
-                                 (or @so-archives-total 1)))
-                       2)
-             "% filtering, "
-             (or @so-index-progress 0)
-             " indexing")]
-       [:button {:on-click (fn []
-                             (start-so-grepping))
-                 :class    "btn center-align"}
-        "Create index"])]
+(def so-widget
+  (reagent/create-class
+    {:component-did-mount
+     (fn []
+       (.autocomplete
+         (js/jQuery "#so-tags-autocomplete")
+         (.map (top-tags) #(js-obj "value" (js/unescape %))))
+       (.on
+         (js/jQuery "#so-tags-autocomplete")
+         "autocompleted"
+         (fn [event name]
+           (reset! so-index-tags
+                   (conj @so-index-tags name))
+           (reset! user-tags
+                   (conj @user-tags name)))))
 
-    [:div
-     [:p "~8GB BitTorrent download required. (provided by archive.org)"]
-     (if @so-downloading
-       [:div
-        [:p (str "Progress: " (if (= 0 @so-download-total)
-                                0
-                                (min 99
-                                     ; never show 100% while downloading
-                                     (.round js/Math
-                                             (* 100 (/ @so-download-progress
-                                                       @so-download-total)))))
-                 "%")]
-        [:p (str "Peers: " @so-download-peers
-                 ", DL " @so-dl-speed "kB/s, UL " @so-ul-speed " kB/s")]]
-       [:a
-        {:on-click #(start-so-download)}
-        "Click here to start."])]))
+     :reagent-render
+     (fn []
+       (if @so-archives-available
+         [:div
+          [:ul {:class "collection with-header"}
+           [:li {:class "collection-header"}
+            "Suggested tags (select ones you want in your index):"]
+           (doall (for [tag (concat suggested-tags @user-tags)]
+                    (do ^{:key (str "so_tags_" tag)}
+                        [:li {:class "collection-item"}
+                         [:input {:type     "checkbox"
+                                  :id       (str "so_tag_cb_" tag)
+                                  :checked  (get @so-index-tags tag)
+                                  :disabled @so-indexing
+                                  :on-change
+                                            (fn []
+                                              (if (nil? (get @so-index-tags tag))
+                                                (reset! so-index-tags
+                                                        (conj @so-index-tags tag))
+                                                (reset! so-index-tags
+                                                        (disj @so-index-tags tag))))}]
+                         [:label {:for   (str "so_tag_cb_" tag)
+                                  :class "checkable"} tag]]
+                        )))
+           [:li {:class "collection-item"}
+            "Enter custom tag (click or press Enter to add):"
+            [:br]
+            [:div {:class "input-field"
+                   :style {"margin-top" 0}}
+             [:input {:id "so-tags-autocomplete"
+                      :on-key-down
+                          (fn [e]
+                            (if (= (.-key e) "Enter")
+                              (do
+                                (reset! so-index-tags
+                                        (conj @so-index-tags (.-value (.-target e))))
+                                (reset! user-tags
+                                        (conj @user-tags (.-value (.-target e))))
+                                (set! (.-value (.-target e)) ""))))}]]]]
+          (if @so-indexing
+            [:p (str
+                  "Indexing: "
+                  (.toFixed (* 100 (/ (or @so-grep-progress 0)
+                                      (or @so-archives-total 1)))
+                            2)
+                  "% filtering, "
+                  (or @so-index-progress 0)
+                  " indexing")]
+            [:button {:on-click (fn []
+                                  (start-so-grepping))
+                      :class    "btn center-align"}
+             "Create index"])]
+
+         [:div
+          [:p "~8GB BitTorrent download required. (provided by archive.org)"]
+          (if @so-downloading
+            [:div
+             [:p (str "Progress: " (if (= 0 @so-download-total)
+                                     0
+                                     (min 99
+                                          ; never show 100% while downloading
+                                          (.round js/Math
+                                                  (* 100 (/ @so-download-progress
+                                                            @so-download-total)))))
+                      "%")]
+             [:p (str "Peers: " @so-download-peers
+                      ", DL " @so-dl-speed "kB/s, UL " @so-ul-speed " kB/s")]]
+            [:a
+             {:on-click #(start-so-download)}
+             "Click here to start."])]))}))
 
 (defn download-devdocs [slug db-size]
   (let [request (.require js/window "request")
@@ -583,7 +624,7 @@
            {:class "secondary-content"
             :href  "#"}
            [:i {:class "material-icons"} "expand_more"]]]
-         (if @so-visible (so-widget))]]]]
+         (if @so-visible [so-widget])]]]]
 
      [:div {:class "modal-footer"}
       [:a {:class "modal-action modal-close btn-flat"}
