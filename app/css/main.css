@@ -96,6 +96,9 @@ a:hover {
     display: inline-block;
     width: auto;
 }
+.error {
+    color: red;
+}
 
 .gutter {
   background-color: #eee;

@@ -11,6 +11,7 @@
 (def devdocs-reindexing-progress (reagent/atom ""))
 (def so-visible (reagent/atom false))
 (def downloading (reagent/atom {}))
+(def downloading-error (reagent/atom {}))
 (def so-indexing (reagent/atom false))
 (def so-downloading (reagent/atom false))
 (def so-download-progress (reagent/atom 0))
@@ -78,14 +79,14 @@
                 (.close
                   @zest.core/symbol-db
                   (fn [] (go
-                    (async/<! (async-rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols")))
-                    (.move
-                      fs
-                      (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")
-                      (.join path (zest.docs.registry/get-devdocs-root) "symbols")
-                      (fn []
-                        (zest.core/open-symbol-db  ; update query results
-                          #(zest.docs.registry/update-installed-devdocs))))))))
+                           (async/<! (async-rimraf (.join path (zest.docs.registry/get-devdocs-root) "symbols")))
+                           (.move
+                             fs
+                             (.join path (zest.docs.registry/get-devdocs-root) "new_symbols")
+                             (.join path (zest.docs.registry/get-devdocs-root) "symbols")
+                             (fn []
+                               (zest.core/open-symbol-db    ; update query results
+                                 #(zest.docs.registry/update-installed-devdocs))))))))
             (reset! devdocs-reindexing-progress
                     (str @indexed-count "/" all-count))))]
     (if (> all-count 0)
@@ -342,26 +343,26 @@
             extractor (if (= (.-platform js/process) "linux")
                         nil
                         (run-so-extractor (array)))]
-          (if (not (nil? extractor))
-            (do
-              (.pipe (.-stdout extractor)
-                     (.-stdin sogrep))
-              (.on extractor "close" #(.end (.-stdin sogrep)))))
+        (if (not (nil? extractor))
+          (do
+            (.pipe (.-stdout extractor)
+                   (.-stdin sogrep))
+            (.on extractor "close" #(.end (.-stdin sogrep)))))
 
-          (reset! so-archives-total so-archives-total-val)
-          (reset! so-indexing true)
-          (reset! so-grep-progress 0)
-          (.on sogrep "close"
-               (fn [code]
-                 (.log js/console "sogrep exited with code" code)
-                 (if (= 0 code) (start-so-indexing))))
-          (.forEach (.-lines (Lazy. (.-stdout sogrep)))
-                    (fn [line]
-                      (.log js/console (.toString line "utf8"))
-                      (reset! so-grep-progress
-                              (.parseFloat
-                                js/window
-                                (.toString line "utf8")))))))))
+        (reset! so-archives-total so-archives-total-val)
+        (reset! so-indexing true)
+        (reset! so-grep-progress 0)
+        (.on sogrep "close"
+             (fn [code]
+               (.log js/console "sogrep exited with code" code)
+               (if (= 0 code) (start-so-indexing))))
+        (.forEach (.-lines (Lazy. (.-stdout sogrep)))
+                  (fn [line]
+                    (.log js/console (.toString line "utf8"))
+                    (reset! so-grep-progress
+                            (.parseFloat
+                              js/window
+                              (.toString line "utf8")))))))))
 
 (defn so-widget []
   (if @so-archives-available
@@ -428,6 +429,7 @@
         path (.require js/window "path")
         index-done (atom false)
         index-data (atom)
+        parsing-succeeded (atom false)
         db-done (atom false)
         db-data (atom "")
         db-bytes (atom 0)
@@ -436,27 +438,51 @@
         on-done
         (fn []
           (.sync mkdirp doc-dir)
-          (.writeFileSync fs (.join path doc-dir "index.json") @index-data)
-          (.writeFileSync fs (.join path doc-dir "db.json") @db-data)
-          (reset! downloading (dissoc @downloading slug))
-          (zest.docs.registry/update-installed-devdocs))]
+          (try
+            (.parse js/JSON @index-data)
+            (.parse js/JSON @db-data)
+            (reset! parsing-succeeded true)
+            (catch js/Object e
+              (reset! downloading (dissoc @downloading slug))
+              (reset! downloading-error (assoc @downloading-error
+                                          slug (str "Parse error: " e)))))
+          (if @parsing-succeeded
+            (do
+              (.writeFileSync fs (.join path doc-dir "index.json") @index-data)
+              (.writeFileSync fs (.join path doc-dir "db.json") @db-data)
+              (reset! downloading (dissoc @downloading slug))
+              (reset! downloading-error (dissoc @downloading slug))
+              (zest.docs.registry/update-installed-devdocs))))]
 
     (reset! downloading (assoc @downloading slug 0))
     (request (str "http://maxcdn-docs.devdocs.io/" slug "/index.json")
              (fn [error response body]
-               (reset! index-data body)
-               (if @db-done (on-done)
-                            (reset! index-done true))))
+               (if error
+                 (do (reset! downloading (dissoc @downloading slug))
+                     (reset! downloading-error (assoc @downloading-error
+                                                 slug error)))
+                 (do (reset! index-data body)
+                     (if @db-done (on-done)
+                                  (reset! index-done true))))))
+
     (.on db-request "data"
          (fn [chunk]
            (reset! db-bytes (+ @db-bytes (.-length chunk)))
            (reset! db-data (str @db-data chunk))
-           (reset! downloading
-                   (assoc
-                     @downloading
-                     slug
-                     (.round js/Math
-                             (/ (* 100 @db-bytes) db-size))))))
+           (if (contains? @downloading slug)
+             (reset! downloading
+                     (assoc
+                       @downloading
+                       slug
+                       (.round js/Math
+                               (/ (* 100 @db-bytes) db-size)))))))
+
+    (.on db-request "error"
+         (fn [err]
+           (reset! downloading (dissoc @downloading slug))
+           (reset! downloading-error (assoc @downloading-error
+                                       slug err))))
+
     (.on db-request "end"
          (fn []
            (if @index-done (on-done)
@@ -540,7 +566,12 @@
                                         (.-slug doc)
                                         (aget doc "db_size"))
                             :href     "#"}
-                           [:i {:class "material-icons"} "cloud_download"]]]))))])
+                           [:i {:class "material-icons"} "cloud_download"]]
+                          (if (contains? @downloading-error (.-slug doc))
+                            [:div
+                             {:class "error"}
+                             (str "Download failed: "
+                                  (get @downloading-error (.-slug doc)))])]))))])
 
          [:li {:class    "collapsible-header"
                :on-click #(reset! so-visible
