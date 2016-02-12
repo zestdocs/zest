@@ -8,6 +8,8 @@ a:hover {
 
 #settings-modal {
     min-width: 1000px;
+    max-height: 90%;
+    top: 5% !important;
 }
 
 @font-face {
