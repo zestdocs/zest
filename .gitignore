@@ -53,3 +53,17 @@ app/SOPython
 sqlite_score/zest_score.sqlext
 sogrep-src/x64
 nodelucene/x64
+bzip2.v120.1.0.6.2
+LevelDB.1.16.0.5
+LucenePlusPlus
+Microsoft
+node-sqlite3
+rapidjson.1.0.2
+zlib-1.2.8
+zlib-1.2.8.tar
+xercesc.3.1.1
+xercesc.redist.3.1.1
+libarchive
+lein.bat
+electron-v*-win32*
+bzip2_prefix

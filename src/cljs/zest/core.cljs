@@ -60,15 +60,10 @@
 
 (def symbol-db (atom nil))
 
-(def app-dir
-  (let [path (.require js/window "path")]
-    (.join path
-           (.dirname path (.-__dirname js/window)))))
-
 (def extension-path
   (let [path (.require js/window "path")]
     (.join path
-           app-dir
+           (.dirname path (.-__dirname js/window))
            "sqlite_score"
            "zest_score.sqlext")))
 
@@ -182,7 +177,9 @@
                       handlebars
                       (.readFileSync fs
                                      (.join path
-                                            app-dir "app/templates/post.handlebars")
+                                            (.-__dirname js/window)
+                                            "templates"
+                                            "post.handlebars")
                                      "utf8"))]
             (.registerHelper
               handlebars
@@ -194,7 +191,9 @@
               handlebars
               "renderComments"
               (.readFileSync fs (.join path
-                                       app-dir "app/templates/comments.handlebars")
+                                       (.-__dirname js/window)
+                                       "templates"
+                                       "comments.handlebars")
                              "utf8"))
             (.log js/console data)
             (tpl (js-obj "post" data))))]
@@ -418,9 +417,11 @@
              [:webview
               {:id      "right-contents"
                :src     (.join path
-                               app-dir "app/viewer.html")
+                               (.-__dirname js/window)
+                               "viewer.html")
                :preload (.join path
-                               app-dir "app/viewer.js")}]])}))
+                               (.-__dirname js/window)
+                               "viewer.js")}]])}))
 
      refresh
      (fn []

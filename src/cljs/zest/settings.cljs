@@ -139,8 +139,7 @@
 (defn top-tags []
   (let [fs (.require js/window "fs")
         path (.require js/window "path")
-        filename (.join path zest.core/app-dir
-                        "app" "sotags.json")]
+        filename (.join (.-__dirname js/window) "sotags.json")]
     (.parse js/JSON (.readFileSync fs filename "utf8"))))
 
 (def user-tags (reagent/atom []))
