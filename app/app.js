@@ -132,6 +132,47 @@ const browserWindowOptions = {
 // Ready
 //------------------------------------------------------------------------------
 
+app.processCmdLine = function(commandLine) {
+  if (commandLine.length > 2 &&
+        commandLine[commandLine.length - 2] == '--query') {
+    var query = commandLine[commandLine.length - 1];
+    var docsets = query.split(':', 2)[0];
+    query = query.split(':', 2)[1];
+    mainWindow.webContents.executeJavaScript('setQuery(' +
+        JSON.stringify(query) + ', ' +
+        JSON.stringify(docsets) +
+    ')');
+  } else if (commandLine[commandLine.length - 1].indexOf('dash-plugin://') == 0) {
+    var url = commandLine[commandLine.length - 1];
+    if (url.indexOf('?') != url.indexOf('//') + 2) {
+        // fix for missing question mark from some plugins
+        url = url.replace('//', '//?');
+    }
+    var parsed = require('url').parse(url, true);
+    mainWindow.webContents.executeJavaScript('setQuery(' +
+        JSON.stringify(parsed.query.query) + ', ' +
+        (parsed.query.keys ? JSON.stringify(parsed.query.keys) : 'null') +
+    ')');
+  }
+}
+
+var shouldQuit = app.makeSingleInstance(function(commandLine, workingDirectory) {
+  // Someone tried to run a second instance, we should focus our window.
+
+  app.processCmdLine(commandLine);
+
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+  return true;
+});
+
+if (shouldQuit) {
+  app.quit();
+  return;
+}
+
 
 // This method will be called when atom-shell has done everything
 // initialization and ready for creating browser windows.

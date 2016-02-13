@@ -113,6 +113,7 @@
 
 
 (def query (reagent/atom ""))
+(def cur-docsets (reagent/atom nil))
 (def query-immediate (reagent/atom nil))
 (def query-timeout (reagent/atom nil))
 (def nonfts-results (reagent/atom []))
@@ -124,35 +125,57 @@
 
 (def devdocs-key #(str (.-docset %) "/" (.-path (.-contents %))))
 
-(defn query-symbol-db [query]
+(defn query-symbol-db [query docsets]
   (let [res (async/chan)
+        docsets (if docsets (.split docsets ","))
+        docsets-where
+        (if docsets
+          (str "AND ("
+               (.join
+                 (apply array (repeat (.-length docsets)
+                                      "LOWER(docset) LIKE LOWER(?)"))
+                 " OR ")
+               ")"))
         prep (.prepare
                @symbol-db
-               "SELECT s, docset, path, zestScore(?, ns) AS score FROM idx WHERE score > 0 ORDER BY score DESC LIMIT 100")]
-    (.all prep query
+               (str
+                 "SELECT s, docset, path, zestScore(?, ns) AS score "
+                 "FROM idx WHERE score > 0 " docsets-where
+                 " ORDER BY score DESC LIMIT 100"))
+        args (array query)]
+    (if docsets (.apply (.-push args) args
+                        (.map docsets #(str % "%"))))
+    (.apply
+      (.-all prep)
+      prep
+      (.concat
+        args
+        (array
           (fn [e data]
             (go (async/>! res (map
                                 #(js-obj "docset" (.-docset %)
                                          "contents" (js-obj "path" (.-path %)
                                                             "name" (.-s %)))
-                                data)))))
+                                data)))))))
     res))
 
-(defn do-match-chunks [query]
+(defn do-match-chunks [query docsets cb]
   (.interrupt @symbol-db)
   (go (reset!
         results
         (concat
-          (async/<! (query-symbol-db query))
+          (async/<! (query-symbol-db query docsets))
           [(js-obj "contents" (js-obj "path" "__FTS__"
-                                      "name" "More DevDocs results..."))]))))
+                                      "name" "More DevDocs results..."))]))
+      (if cb (cb))))
 
-(defn match-chunks [query]
+(defn match-chunks [query docsets cb]
   (reset! query-timeout
-          (.setTimeout js/window (do-match-chunks query) 1)))
+          (.setTimeout js/window (do-match-chunks query docsets cb) 1)))
 
-(defn set-query [q]
+(defn set-query-with-cb [q docsets cb]
   (reset! query q)
+  (reset! cur-docsets docsets)
   (if (= (count q) 0)
     (reset! results [])
     (do
@@ -164,8 +187,11 @@
                 search-results
                 (async/<!
                   (zest.searcher/search so-index (str prep-query "*")))))))
-      (match-chunks q)
+      (match-chunks q docsets cb)
       (reset! index 0))))
+
+(defn set-query [q]
+  (set-query-with-cb q nil nil))
 
 (defn render-so-post [data]
   (let [render-template
@@ -489,6 +515,11 @@
        (fn []
          [:div {:style {:height "100%"}}
           [:div {:id "left"}
+           (if (not (nil? @cur-docsets))
+             [:div {:class "searchDocset"}
+              [:span "Showing results from '"]
+              [:strong @cur-docsets]
+              [:span "' only"]])
            [:input
             {:id   "searchInput"
              :type "text"
@@ -550,6 +581,17 @@
                                                    (render-item i item)
                                                    ))])
             (if (> (count @query) 0) (fts-suggestions))]]
+          (set! (.-setQuery js/window)
+                (fn [q docsets]
+                  (set!
+                    (.-value
+                      (.getElementById js/document "searchInput"))
+                    q)
+                  (set-query-with-cb
+                    q docsets
+                    #(let [entry (nth @results 0)]
+                      (activate-item (.-docset entry)
+                                     (.-contents entry))))))
           [right-class]
           [zest.settings/register-settings]])})))
 
@@ -598,7 +640,9 @@
   (add-figwheel-handler)
   (zest.searcher/new-searcher so-index)
   (open-symbol-db nil)
-  (mount-root))
+  (mount-root)
+  (.processCmdLine (.-app (.-remote (js/require "electron")))
+                   (.-argv (.-process (.-remote (js/require "electron"))))))
 
 (defn on-figwheel-reload []
   (init!))

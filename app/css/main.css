@@ -35,6 +35,18 @@ a:hover {
   -webkit-font-smoothing: antialiased;
 }
 
+.searchDocset {
+    display: flex;
+    height: 3rem;
+    position: absolute;
+    width: inherit;
+    align-items: flex-end;
+    justify-content: flex-end;
+    color: #aaa;
+    padding: 0.5rem;
+    font-size: 75%;
+    z-index: -1000;
+}
 #searchInput {
     padding: 0;
     margin: 0;
