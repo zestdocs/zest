@@ -15,9 +15,13 @@
                          (zest.core/get-binary-path "searcher")
                          (array path)
                          (js-obj
-                           "env" (js-obj
-                                   "PATH"
-                                   (.dirname jspath (.dirname jspath (.-__dirname js/window))))))]
+                           "env"
+                           (js-obj
+                             "PATH"
+                             (str
+                               (.dirname jspath (.dirname jspath (.-__dirname js/window)))
+                               (.-delimiter jspath)
+                               (.-PATH (.-env (.-process js/window)))))))]
     (reset! cur-searchers (assoc @cur-searchers path searcher))
     (reset! cur-searchers-lines (assoc @cur-searchers-lines path ch))
     (.on
