@@ -68,8 +68,7 @@
         (fn []
           (reset! indexed-count (inc @indexed-count))
           (if (= @indexed-count all-count)
-            (go (reset! devdocs-reindexing false)
-                (.endWriting @idx)
+            (go (.endWriting @idx)
                 (async/<! (async-rimraf (.join path (zest.docs.registry/get-devdocs-root) "lucene")))
                 (.move
                   fs
@@ -86,7 +85,16 @@
                              (.join path (zest.docs.registry/get-devdocs-root) "symbols")
                              (fn []
                                (zest.core/open-symbol-db    ; update query results
-                                 #(zest.docs.registry/update-installed-devdocs))))))))
+                                 #(zest.docs.registry/update-installed-devdocs)))))))
+                (doall (for [docset @zest.docs.registry/installed-devdocs-atom]
+                         (.writeFileSync
+                           fs
+                           (.join path
+                                  (zest.docs.registry/get-devdocs-docs-root)
+                                  docset
+                                  "is_indexed")
+                           "")))
+                (reset! devdocs-reindexing false))
             (reset! devdocs-reindexing-progress
                     (str @indexed-count "/" all-count))))]
     (if (> all-count 0)
@@ -230,7 +238,6 @@
   (let [levelup (.require js/window "levelup")
         path (.require js/window "path")
         fs (.require js/window "fs-extra")
-        rimraf (.require js/window "rimraf")
         db (levelup.
              (.join path (zest.docs.registry/get-so-root) "new_index" "leveldb"))
         rStream (.createReadStream
@@ -534,7 +541,8 @@
 (defn settings-modal []
   (let [path (.require js/window "path")
         rimraf (.require js/window "rimraf")
-        shell (.require js/window "shell")]
+        shell (.require js/window "shell")
+        fs (.require js/window "fs")]
     [:div
      {:class "modal"
       :id    "settings-modal"}
@@ -567,7 +575,17 @@
                                        (zest.docs.registry/get-devdocs-docs-root)
                                        doc)
                                 #(zest.docs.registry/update-installed-devdocs)))}
-                    [:i {:class "material-icons"} "delete"]]]))]]
+                    [:i {:class "material-icons"} "delete"]]
+                   (if
+                     (not
+                       (.existsSync
+                         fs
+                         (.join path
+                                (zest.docs.registry/get-devdocs-docs-root)
+                                doc
+                                "is_indexed")))
+                     [:div {:class "error"}
+                      "Not indexed. Click 'Build index' above."])]))]]
        [:div {:class "col s6"}
         [:h5 "Available documentation"]
         [:ul {:class "collapsible"}
