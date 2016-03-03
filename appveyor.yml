@@ -14,7 +14,7 @@ install:
 build_script:
 - cmd: scripts\build_app
 artifacts:
-- path: builds\zest-v0.1.0-alpha2-pre\zest-v0.1.0-alpha2-pre.exe
+- path: zest-setup.exe
 cache:
 - C:\Libraries\boost_1_59_0\stage\lib
 - C:\Libraries\boost_1_59_0\bin.v2

@@ -130,13 +130,14 @@ function getBuildMeta() {
     version: tokens[2].replace(/"/g, "").trim(),
     date:    moment().format("YYYY-MM-DD")
   };
-  var commit = exec("git rev-list HEAD --count", {silent:true}).output.trim();
-  if (commit != '') {
-    build.commit = "pre";
+  var tag = exec("git tag --points-at HEAD", {silent:true}).output.trim();
+  if (tag == 'v' + build.version) {
+    build.commit = "";
   } else {
-    build.commit = commit;
+    build.commit = exec("git rev-list --max-count=1 HEAD", {silent:true}).output.trim();
   }
-  build.releaseName = build.name + "-v" + build.version + "-" + build.commit;
+  build.releaseName = build.name + "-v" + build.version +
+    (build.commit ? "-" + build.commit : "");
   return build;
 }
 
@@ -307,7 +308,7 @@ grunt.registerTask('release-win', function() {
         grunt.log.writeln("\nSkipping windows installer creation:", "makensis not installed or not in path".cyan);
     }
   };
-  cb('builds/zest-v0.1.0-alpha2-pre/zest-win32-x64');
+  cb('builds/'+build.releaseName+'/zest-win32-x64');
   done();
 });
 grunt.registerTask('prepare-win', function() {
