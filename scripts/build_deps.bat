@@ -72,10 +72,10 @@ msbuild sogrep.vcxproj /p:Configuration=Release
 msbuild extractor.vcxproj /p:Configuration=Release
 
 cd ..
-c:\msys64\usr\bin\wget --quiet https://github.com/atom/electron/releases/download/v0.36.7/electron-v0.36.7-win32-x64.zip
+c:\msys64\usr\bin\wget --quiet https://github.com/atom/electron/releases/download/v0.36.7/electron-v0.36.9-win32-x64.zip
 mkdir electron
 cd electron
-c:\msys64\usr\bin\unzip ..\electron-v0.36.7-win32-x64.zip
+c:\msys64\usr\bin\unzip ..\electron-v0.36.9-win32-x64.zip
 
 cd ..\nodelucene
 copy /y CMakeLists.txt.appveyor CMakeLists.txt
@@ -91,10 +91,10 @@ call npm install -g node-gyp
 set USERPROFILE=%USERPROFILE%\.electron-gyp
 REM ## rebuild leveldown:
 cd node_modules\leveldown
-call node-gyp rebuild --target=0.36.7 --arch=x64 --dist-url=https://atom.io/download/atom-shell
+call node-gyp rebuild --target=0.36.9 --arch=x64 --dist-url=https://atom.io/download/atom-shell
 REM ## rebuild nodelucene:
 cd ..\..
-call node-gyp rebuild --target=0.36.7 --arch=x64 --dist-url=https://atom.io/download/atom-shell
+call node-gyp rebuild --target=0.36.9 --arch=x64 --dist-url=https://atom.io/download/atom-shell
 
 copy build\Release\nodelucene.node node_modules
 
@@ -117,7 +117,7 @@ call npm install .\node-sqlite3
 
 cd node_modules\sqlite3
 call node-gyp configure --module_name=node_sqlite3 --module_path=../lib/binding/node-v47-win32-x64
-call node-gyp rebuild --target=0.36.7 --arch=x64 --target_platform=win32 --dist-url=https://atom.io/download/atom-shell --module_name=node_sqlite3 --module_path=../lib/binding/node-v47-win32-x64
+call node-gyp rebuild --target=0.36.9 --arch=x64 --target_platform=win32 --dist-url=https://atom.io/download/atom-shell --module_name=node_sqlite3 --module_path=../lib/binding/node-v47-win32-x64
 cd ..\..
 copy /y node_modules\sqlite3\build\Release\node_sqlite3.node node_modules\sqlite3\lib\binding\node-v47-win32-x64
 
