@@ -46,6 +46,3 @@ cd ..\..
 call choco install nsis.install -pre -y
 set PATH=C:\Program Files (x86)\NSIS\Bin;%PATH%
 call grunt release-win
-
-cd builds\zest-v*
-copy zest-v*.exe ..\..\zest-setup.exe
