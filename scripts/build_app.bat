@@ -27,11 +27,11 @@ mkdir zest-win32-x64\resources\sqlite_score
 copy ..\..\sqlite_score\zest_score.sqlext zest-win32-x64\resources\sqlite_score
 copy ..\..\sogrep-src\Release\*.exe zest-win32-x64\resources
 copy ..\..\nodelucene\Release\searcher.exe zest-win32-x64\resources
-copy "LucenePlusPlus\build\src\core\Release\lucene++.dll" zest-win32-x64
-copy "LucenePlusPlus\build\src\contrib\Release\lucene++-contrib.dll" zest-win32-x64
-copy xercesc.redist.3.1.1\build\native\bin\x64\v110\Release\xerces-c_3_1.dll zest-win32-x64
-copy libarchive\zest_build\bin\Release\archive.dll zest-win32-x64
-copy bzip2.v120.1.0.6.2\build\native\bin\x64\Release\bzip2.dll zest-win32-x64
+copy "..\..\LucenePlusPlus\build\src\core\Release\lucene++.dll" zest-win32-x64
+copy "..\..\LucenePlusPlus\build\src\contrib\Release\lucene++-contrib.dll" zest-win32-x64
+copy ..\..\xercesc.redist.3.1.1\build\native\bin\x64\v110\Release\xerces-c_3_1.dll zest-win32-x64
+copy ..\..\libarchive\zest_build\bin\Release\archive.dll zest-win32-x64
+copy ..\..\bzip2.v120.1.0.6.2\build\native\bin\x64\Release\bzip2.dll zest-win32-x64
 
 copy "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\redist\x64\Microsoft.VC110.CRT\msvcr110.dll" zest-win32-x64
 copy C:\Libraries\boost_1_59_0\stage\lib\boost_filesystem-vc120-mt-1_59.dll zest-win32-x64
