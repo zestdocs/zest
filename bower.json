@@ -2,7 +2,8 @@
   "name": "zest",
   "version": "0.0.0",
   "dependencies": {
-    "Materialize": "https://github.com/zestdocs/materialize.git#v0.97.5.autocomplete"
+    "Materialize": "https://github.com/zestdocs/materialize.git#v0.97.5.autocomplete",
+    "jquery": ">=2.1.1"
   },
   "license": "MIT",
   "private": true,

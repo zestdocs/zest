@@ -1,0 +1,15 @@
+machine:
+  node:
+    version: 5.1.0
+dependencies:
+  pre:
+    - sudo apt-get update; sudo apt-get install cmake libxerces-c-dev libboost-date-time-dev libboost-filesystem-dev libboost-iostreams-dev libboost-regex-dev libboost-system-dev libboost-thread-dev libleveldb-dev
+  override:
+    - ./scripts/build_circle_deps.sh
+  cache_directories:
+    - ~/LucenePlusPlus
+    - ~/libarchive
+    - ~/patchelf-0.9
+test:
+  override:
+    - ./scripts/build_circle.sh
