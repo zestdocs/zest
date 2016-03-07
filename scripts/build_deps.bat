@@ -122,5 +122,6 @@ cd ..\..
 copy /y node_modules\sqlite3\build\Release\node_sqlite3.node node_modules\sqlite3\lib\binding\node-v47-win32-x64
 
 call grunt setup
+call bower install
 
 c:\msys64\usr\bin\wget --quiet https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein.bat
