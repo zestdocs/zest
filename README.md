@@ -1,3 +1,8 @@
+# Project status
+
+As mentioned at https://zestdocs.org/ I've now decided to stop maintaining Zest. Hence please do not expect updates or support. If anyone is insterested in continuing, feel free to contact me at the email from the commit messages. I'd be willing to transfer the zestdocs.org domain and Mac App Store app ownership in case someone shows more interest than me.
+
+It [was certainly fun](https://medium.com/@jerzy.kozera/from-zeal-devdocs-to-zest-my-docs-journey-93fa4bf08a8f#.t59nt74b7) to implement this project, but sadly I don't have enough motivation to continue at this point. I feel obliged to let the users know about this decision, hence the notice.
 
 # zest
 
